@@ -11,6 +11,7 @@ using Supabase.Core.Http;
 using Supabase.Gotrue.Exceptions;
 using Supabase.Gotrue.Interfaces;
 using Supabase.Gotrue.Mfa;
+using Supabase.Gotrue.Resend;
 using Supabase.Gotrue.Responses;
 using static Supabase.Gotrue.Constants;
 
@@ -849,7 +850,7 @@ public class Api : IGotrueApi<User, Session>
     /// </summary>
     /// <param name="resendParameters"></param>
     /// <returns>BaseResponse</returns>
-    public Task<BaseResponse> Resend(Resend.ResendParameters resendParameters) => this.MakeRequestAsync(
+    public Task<BaseResponse> Resend(ResendParameters resendParameters) => this.MakeRequestAsync(
         HttpMethod.Post,
         $"{this.Url}/resend",
         resendParameters,
