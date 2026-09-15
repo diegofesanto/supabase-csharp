@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
@@ -96,24 +97,36 @@ public class Api : IGotrueApi<User, Session>
             }
         }
 
-        var response = await this.MakeRequestAsync(HttpMethod.Post, endpoint, body, this.Headers);
+        return await this.PostSignUp(endpoint, body).ConfigureAwait(false);
+    }
 
-        if (!string.IsNullOrEmpty(response.Content))
+    private async Task<Session?> PostSignUp(string endpoint, Dictionary<string, object> body)
+    {
+        var response = await this.MakeRequestAsync(HttpMethod.Post, endpoint, body, this.Headers).ConfigureAwait(false);
+        return ReadSignUpResponse(response.Content);
+    }
+
+    /// <summary>Reads a sign-up response: a session, the bare user returned while confirmation is pending, or null.</summary>
+    private static Session? ReadSignUpResponse(string? content)
+    {
+        if (string.IsNullOrEmpty(content))
         {
-            // Gotrue returns a Session object for an auto-/pre-confirmed account
-            var session = JsonSerializer.Deserialize<Session>(response.Content!, Helpers.SerializerOptions);
-
-            // If account is unconfirmed, Gotrue returned the user object, so fill User data
-            // in from the parsed response.
-            if (session is { User: null })
-            {
-                // Gotrue returns a User object for an unconfirmed account
-                session.User = JsonSerializer.Deserialize<User>(response.Content!, Helpers.SerializerOptions);
-            }
-
-            return session;
+            return null;
         }
-        return null;
+
+        var session = JsonSerializer.Deserialize<Session>(content, Helpers.SerializerOptions);
+        if (session is { User: null })
+        {
+            // An acknowledgement such as { msg, code } must not become an empty User.
+            var user = JsonSerializer.Deserialize<User>(content, Helpers.SerializerOptions);
+            session.User = user?.Id != null ? user : null;
+            if (session.User == null && session.AccessToken == null)
+            {
+                return null;
+            }
+        }
+
+        return session;
     }
 
     /// <summary>
@@ -384,7 +397,7 @@ public class Api : IGotrueApi<User, Session>
             }
         }
 
-        return this.MakeRequestAsync<Session>(HttpMethod.Post, endpoint, body, this.Headers);
+        return this.PostSignUp(endpoint, body);
     }
 
     /// <summary>
@@ -523,11 +536,9 @@ public class Api : IGotrueApi<User, Session>
             ["Authorization"] = $"Bearer {jwt}"
         };
 
-        // New-format API keys (sb_publishable_/sb_secret_) are rejected on Authorization-only requests;
-        // the gateway requires an apikey header too. Preserve an apikey the caller already supplied (the
-        // stateful client injects the project key via GetHeaders — note the "apiKey" casing), otherwise
-        // fall back to the bearer token, matching supabase-js standalone admin usage.
-        if (!headers.Keys.Any(key => string.Equals(key, "apikey", StringComparison.OrdinalIgnoreCase)))
+        // Opaque keys need an apikey header too. Keep any configured key and never copy a JWT here (#424).
+        var hasApiKey = headers.Keys.Any(key => string.Equals(key, "apikey", StringComparison.OrdinalIgnoreCase));
+        if (!hasApiKey && !new JwtSecurityTokenHandler().CanReadToken(jwt))
             headers["apikey"] = jwt;
 
         return headers;

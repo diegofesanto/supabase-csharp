@@ -120,13 +120,13 @@ internal class WhereExpressionVisitor : ExpressionVisitor
         Type? columnType = null;
         if (node.Left is MemberExpression leftMember)
         {
-            column = this.GetColumnFromMemberExpression(leftMember);
+            column = this.ResolveColumn(leftMember);
             columnType = leftMember.Type;
         } //To handle properly if it's a Convert ExpressionType generally with nullable properties
         else if (node.Left is UnaryExpression leftUnary && leftUnary.NodeType == ExpressionType.Convert &&
                  leftUnary.Operand is MemberExpression leftOperandMember)
         {
-            column = this.GetColumnFromMemberExpression(leftOperandMember);
+            column = this.ResolveColumn(leftOperandMember);
             columnType = leftOperandMember.Type;
         }
 
@@ -169,6 +169,17 @@ internal class WhereExpressionVisitor : ExpressionVisitor
 
         return node;
     }
+
+    /// <summary>
+    /// Handles a ternary (i.e. `x => x.IsProtected ? false : x.IsExpired`), visited as
+    /// `(test &amp;&amp; a) || (!test &amp;&amp; b)` so the test is kept.
+    /// </summary>
+    /// <param name="node"></param>
+    /// <returns></returns>
+    protected override Expression VisitConditional(ConditionalExpression node) =>
+        this.Visit(Expression.OrElse(
+            Expression.AndAlso(node.Test, node.IfTrue),
+            Expression.AndAlso(Expression.Not(node.Test), node.IfFalse)));
 
     /// <summary>
     /// Handles a boolean column used directly as a predicate (i.e. `x => x.IsActive`, or negated via
@@ -434,16 +445,16 @@ internal class WhereExpressionVisitor : ExpressionVisitor
 
     private class ParameterFinder : ExpressionVisitor
     {
-        private readonly ParameterExpression? _target;
+        private readonly ParameterExpression? target;
 
         public ParameterFinder(ParameterExpression? target) =>
-            this._target = target;
+            this.target = target;
 
         public bool Found { get; private set; }
 
         protected override Expression VisitParameter(ParameterExpression node)
         {
-            if (this._target == null || node == this._target)
+            if (this.target == null || node == this.target)
                 this.Found = true;
 
             return base.VisitParameter(node);
