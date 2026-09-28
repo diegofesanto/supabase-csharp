@@ -4,10 +4,12 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Supabase.Core;
 using Supabase.Core.Extensions;
 using Supabase.Core.Http;
+using Supabase.Gotrue.Claims;
 using Supabase.Gotrue.Exceptions;
 using Supabase.Gotrue.Interfaces;
 using Supabase.Gotrue.Mfa;
@@ -66,12 +68,14 @@ public class Api : IGotrueApi<User, Session>
     }
 
     /// <summary>Routes through the resolved <see cref="httpClient"/> and <see cref="retry"/> policy.</summary>
-    private Task<BaseResponse> MakeRequestAsync(HttpMethod method, string url, object? data = null, Dictionary<string, string>? headers = null) =>
-        Helpers.MakeRequestAsync(method, url, data, headers, this.httpClient, this.retry);
+    private Task<BaseResponse> MakeRequestAsync(HttpMethod method, string url, object? data = null, Dictionary<string, string>? headers = null,
+        CancellationToken cancellationToken = default) =>
+        Helpers.MakeRequestAsync(method, url, data, headers, this.httpClient, this.retry, cancellationToken);
 
     /// <summary>Routes through the resolved <see cref="httpClient"/> and <see cref="retry"/> policy.</summary>
-    private Task<T?> MakeRequestAsync<T>(HttpMethod method, string url, object? data = null, Dictionary<string, string>? headers = null) where T : class =>
-        Helpers.MakeRequestAsync<T>(method, url, data, headers, this.httpClient, this.retry);
+    private Task<T?> MakeRequestAsync<T>(HttpMethod method, string url, object? data = null, Dictionary<string, string>? headers = null,
+        CancellationToken cancellationToken = default) where T : class =>
+        Helpers.MakeRequestAsync<T>(method, url, data, headers, this.httpClient, this.retry, cancellationToken);
 
     /// <summary>
     /// Signs a user up using an email address and password.
@@ -95,6 +99,11 @@ public class Api : IGotrueApi<User, Session>
             if (options.Data != null)
             {
                 body.Add("data", options.Data);
+            }
+
+            if (!string.IsNullOrEmpty(options.CaptchaToken))
+            {
+                body.Add("gotrue_meta_security", new Dictionary<string, string> { { "captcha_token", options.CaptchaToken! } });
             }
         }
 
@@ -396,6 +405,11 @@ public class Api : IGotrueApi<User, Session>
             {
                 body.Add("data", options.Data);
             }
+
+            if (!string.IsNullOrEmpty(options.CaptchaToken))
+            {
+                body.Add("gotrue_meta_security", new Dictionary<string, string> { { "captcha_token", options.CaptchaToken! } });
+            }
         }
 
         return this.PostSignUp(endpoint, body);
@@ -687,12 +701,16 @@ public class Api : IGotrueApi<User, Session>
     /// </summary>
     /// <param name="jwt"></param>
     /// <returns></returns>
-    public Task<User?> GetUser(string jwt)
-    {
-        var data = new Dictionary<string, string>();
+    public Task<User?> GetUser(string jwt) => this.GetUserAsync(jwt);
 
-        return this.MakeRequestAsync<User>(HttpMethod.Get, $"{this.Url}/user", data, this.CreateAuthedRequestHeaders(jwt));
-    }
+    /// <summary>
+    /// Gets User Details
+    /// </summary>
+    /// <param name="jwt"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    public Task<User?> GetUserAsync(string jwt, CancellationToken cancellationToken = default) =>
+        this.MakeRequestAsync<User>(HttpMethod.Get, $"{this.Url}/user", null, this.CreateAuthedRequestHeaders(jwt), cancellationToken);
 
     /// <summary>
     /// Get User details by Id
@@ -810,6 +828,14 @@ public class Api : IGotrueApi<User, Session>
     /// <returns>mpose up -d
     /// </returns>
     public Task<Settings?> Settings() => this.MakeRequestAsync<Settings>(HttpMethod.Get, $"{this.Url}/settings", null, this.Headers);
+
+    /// <summary>
+    /// Gets the server's public keys for verifying JWT signatures.
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    public Task<Jwks?> GetJwksAsync(CancellationToken cancellationToken = default) =>
+        this.MakeRequestAsync<Jwks>(HttpMethod.Get, $"{this.Url}/.well-known/jwks.json", null, this.Headers, cancellationToken);
 
     /// <summary>
     /// Generates email links and OTPs to be sent via a custom email provider.

@@ -11,13 +11,14 @@ namespace Supabase.Realtime.Converters;
 /// <summary>
 /// A string array converter that specifically parses Postgrest styled arrays `{big,string,array}` and
 /// `[1,2,3]` from strings into a <see cref="List{T}"/>. A regular JSON array is also accepted; writes emit a
-/// regular JSON array.
+/// regular JSON array. An unquoted `NULL` element reads as null.
 /// </summary>
 public class StringArrayConverter : JsonConverter<List<string>>
 {
     /// <inheritdoc />
     public override List<string>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
+        var start = reader;
         try
         {
             switch (reader.TokenType)
@@ -32,11 +33,14 @@ public class StringArrayConverter : JsonConverter<List<string>>
                         list.Add(reader.GetString()!);
                     return list;
                 default:
+                    reader.Skip();
                     return null;
             }
         }
         catch
         {
+            reader = start;
+            reader.Skip();
             return null;
         }
     }
@@ -53,21 +57,11 @@ public class StringArrayConverter : JsonConverter<List<string>>
     internal static List<string> Parse(string value)
     {
         var result = new List<string>();
-
-        if (string.IsNullOrEmpty(value))
-            return result;
-
-        var firstChar = value[0];
-        var lastChar = value[value.Length - 1];
-
-        var isBraced = (firstChar == '{' && lastChar == '}') || (firstChar == '[' && lastChar == ']');
-        if (!isBraced)
-            return result;
-
-        foreach (var item in value.Trim('{', '}', '[', ']').Split(','))
+        foreach (var item in PostgresArrayLiteral.Parse(value))
         {
-            if (string.IsNullOrEmpty(item)) continue;
-            result.Add(item);
+            if (item is List<object?>)
+                throw new JsonException($"'{value}' is not a flat array of strings.");
+            result.Add((string) item!);
         }
 
         return result;

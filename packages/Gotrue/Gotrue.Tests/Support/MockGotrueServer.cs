@@ -31,6 +31,9 @@ internal sealed class MockGotrueServer : IDisposable
 
     internal void Reset() => this.server.ResetMappings();
 
+    internal int CountReceivedRequests(string? path = null) =>
+        this.server.LogEntries.Count(entry => path == null || entry.RequestMessage!.Path == path);
+
     internal ReceivedRequest VerifySingleReceivedRequest()
     {
         var entry = this.server.LogEntries.Should().ContainSingle("the SDK should emit exactly one request").Which;
@@ -116,7 +119,7 @@ internal sealed class ReceivedRequest
     {
         this.request.Body.Should().NotBeNull("the request should have a body");
         var body = JsonNode.Parse(this.request.Body!)!.AsObject();
-        body[parent]?[field]?.GetValue<string>().Should().Be(expected);
+        ((string?) body[parent]?[field]).Should().Be(expected);
         return this;
     }
 
