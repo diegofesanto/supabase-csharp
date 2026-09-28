@@ -850,10 +850,28 @@ public class Api : IGotrueApi<User, Session>
     /// </summary>
     /// <param name="resendParameters"></param>
     /// <returns>BaseResponse</returns>
-    public Task<BaseResponse> Resend(ResendParameters resendParameters) => this.MakeRequestAsync(
-        HttpMethod.Post,
-        $"{this.Url}/resend",
-        resendParameters,
-        this.Headers
-    );
+    public Task<BaseResponse> Resend(ResendParameters resendParameters)
+    {
+        var body = new Dictionary<string, object>()
+        {
+            { "type", Core.Helpers.GetMappedToAttr(resendParameters.Type).Mapping }
+        };
+
+        if (resendParameters.IsEmail() && !string.IsNullOrWhiteSpace(resendParameters.Email))
+            body.Add("email", resendParameters.Email);
+
+        if (!resendParameters.IsEmail() && !string.IsNullOrWhiteSpace(resendParameters.Phone))
+            body.Add("phone", resendParameters.Phone);
+
+        if (resendParameters.Options != null && !string.IsNullOrWhiteSpace(resendParameters.Options.CaptchaToken))
+            body.Add("gotrue_meta_security", new Dictionary<string, string>() { { "captcha_token", resendParameters.Options.CaptchaToken } });
+
+
+        return this.MakeRequestAsync(
+            HttpMethod.Post,
+            $"{this.Url}/resend",
+            body,
+            this.Headers
+        );
+    }
 }

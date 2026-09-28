@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace Supabase.Gotrue.Resend;
@@ -23,7 +24,7 @@ public class ResendParameters
     /// The type of resend.
     /// </summary>
     [JsonPropertyName("type")]
-    public string? Type { get; set; }
+    public ResendType Type { get; set; }
 
     /// <summary>
     /// Additional options to customize the behavior of the Resend API.
@@ -33,10 +34,17 @@ public class ResendParameters
     public ResendOptions? Options { get; set; }
 
     /// <summary>
-    /// Represents the parameters used for the Resend API, allowing for resending
-    /// confirmation codes or links based on the provided inputs. This includes
-    /// support for email, phone, and custom data.
+    /// Check if the ResendType belongs to email-related types.
     /// </summary>
-    public ResendParameters(ResendType type) =>
-        this.Type = Core.Helpers.GetMappedToAttr(type).Mapping;
+    /// <returns></returns>
+    public bool IsEmail()
+    {
+        var types = new List<ResendType>()
+        {
+            ResendType.EmailChange,
+            ResendType.SignUp
+        };
+
+        return types.Contains(Type);
+    }
 }

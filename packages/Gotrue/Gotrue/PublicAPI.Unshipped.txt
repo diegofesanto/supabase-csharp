@@ -12,12 +12,11 @@ Supabase.Gotrue.Resend.ResendOptions.ResendOptions() -> void
 Supabase.Gotrue.Resend.ResendParameters
 Supabase.Gotrue.Resend.ResendParameters.Email.get -> string?
 Supabase.Gotrue.Resend.ResendParameters.Email.set -> void
+Supabase.Gotrue.Resend.ResendParameters.IsEmail() -> bool
 Supabase.Gotrue.Resend.ResendParameters.Options.get -> Supabase.Gotrue.Resend.ResendOptions?
 Supabase.Gotrue.Resend.ResendParameters.Options.set -> void
 Supabase.Gotrue.Resend.ResendParameters.Phone.get -> string?
 Supabase.Gotrue.Resend.ResendParameters.Phone.set -> void
-Supabase.Gotrue.Resend.ResendParameters.ResendParameters(Supabase.Gotrue.Resend.ResendType type) -> void
-Supabase.Gotrue.Resend.ResendParameters.Type.get -> string?
 Supabase.Gotrue.Resend.ResendParameters.Type.set -> void
 Supabase.Gotrue.Resend.ResendType
 Supabase.Gotrue.Resend.ResendType.EmailChange = 3 -> Supabase.Gotrue.Resend.ResendType
