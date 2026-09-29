@@ -116,3 +116,5 @@ Supabase.Gotrue.Interfaces.IGotrueApi<TUser, TSession>.GetUserAsync(string! jwt,
 Supabase.Gotrue.Interfaces.IGotrueClient<TUser, TSession>.GetClaimsAsync(string? jwt = null, Supabase.Gotrue.Claims.GetClaimsOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Supabase.Gotrue.Claims.GetClaimsResponse!>!
 Supabase.Gotrue.SignUpOptions.CaptchaToken.get -> string?
 Supabase.Gotrue.SignUpOptions.CaptchaToken.set -> void
+Supabase.Gotrue.Interfaces.IGotrueStatelessClient<TUser, TSession>.SignOut(string! accessToken, Supabase.Gotrue.StatelessClient.StatelessClientOptions! options, Supabase.Gotrue.Constants.SignOutScope scope) -> System.Threading.Tasks.Task!
+Supabase.Gotrue.StatelessClient.SignOut(string! accessToken, Supabase.Gotrue.StatelessClient.StatelessClientOptions! options, Supabase.Gotrue.Constants.SignOutScope scope) -> System.Threading.Tasks.Task!
