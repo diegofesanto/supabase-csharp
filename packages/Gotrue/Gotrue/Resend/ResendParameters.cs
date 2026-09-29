@@ -45,6 +45,6 @@ public class ResendParameters
             ResendType.SignUp
         };
 
-        return types.Contains(Type);
+        return types.Contains(this.Type);
     }
 }

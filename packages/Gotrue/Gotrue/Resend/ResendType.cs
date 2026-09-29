@@ -1,4 +1,3 @@
-using System.Runtime.Serialization;
 using Supabase.Core.Attributes;
 
 namespace Supabase.Gotrue.Resend;
