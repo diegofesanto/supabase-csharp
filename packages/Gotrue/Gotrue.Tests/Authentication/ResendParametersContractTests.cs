@@ -1,10 +1,7 @@
-using System.Net;
 using System.Threading.Tasks;
 using Gotrue.Tests.Support;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Supabase.Gotrue.Exceptions;
 using Supabase.Gotrue.Resend;
-using static Gotrue.Tests.TestUtils;
 
 namespace Gotrue.Tests.Authentication;
 
@@ -40,7 +37,11 @@ public class ResendParametersContractTests : RequestApprovalFixture
     [TestMethod]
     public async Task ResendRequest_ShouldSerializeToExpectedPayload_GivenPhoneChangeType()
     {
-        var resend = new ResendParameters { Type = ResendType.PhoneChange, Phone = "+5544998989898"};
+        var resend = new ResendParameters
+        {
+            Type = ResendType.PhoneChange,
+            Phone = "+5544998989898",
+        };
         await this.Api.Resend(resend);
 
         await this.Verify(this.EmittedRequestBody).UseDirectory("Data");
@@ -49,7 +50,22 @@ public class ResendParametersContractTests : RequestApprovalFixture
     [TestMethod]
     public async Task ResendRequest_ShouldSerializeToExpectedPayload_GivenSmsType()
     {
-        var resend = new ResendParameters { Type = ResendType.Sms, Phone = "+5544998989898"};
+        var resend = new ResendParameters { Type = ResendType.Sms, Phone = "+5544998989898" };
+        await this.Api.Resend(resend);
+
+        await this.Verify(this.EmittedRequestBody).UseDirectory("Data");
+    }
+
+    [TestMethod]
+    public async Task ResendRequest_ShouldSerializeCaptchaToExpectedPayload_GivenOptions()
+    {
+        var resend = new ResendParameters
+        {
+            Type = ResendType.SignUp,
+            Email = "user@supabase.com",
+            Options = new ResendOptions { CaptchaToken = "captcha-token" },
+        };
+
         await this.Api.Resend(resend);
 
         await this.Verify(this.EmittedRequestBody).UseDirectory("Data");
