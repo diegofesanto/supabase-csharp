@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace Supabase.Gotrue.Resend;
 
 /// <summary>
@@ -12,12 +10,19 @@ public class ResendOptions
     /// <summary>
     /// Verification token received when the user completes the captcha on the site.
     /// </summary>
-    [JsonPropertyName("captchaToken")]
-    public string? CaptchaToken { get; set; }
+    public string? CaptchaToken { get; }
 
     /// <summary>
     /// A URL or mobile address to send the user to after they are confirmed.
     /// </summary>
-    [JsonPropertyName("emailRedirectTo")]
-    public string? EmailRedirectTo { get; set; }
+    public string? EmailRedirectTo { get; }
+
+    /// <summary>
+    /// Represents optional parameters for a resend operation in the Resend API.
+    /// </summary>
+    public ResendOptions(string? captchaToken, string? emailRedirectTo)
+    {
+        this.CaptchaToken = captchaToken;
+        this.EmailRedirectTo = emailRedirectTo;
+    }
 }

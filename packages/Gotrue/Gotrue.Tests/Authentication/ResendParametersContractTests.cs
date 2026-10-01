@@ -18,7 +18,12 @@ public class ResendParametersContractTests : RequestApprovalFixture
     public async Task ResendRequest_ShouldSerializeToExpectedPayload_GivenSignUpType()
     {
         const string email = "user@supabase.com";
-        var resend = new ResendParameters { Type = ResendType.SignUp, Email = email };
+        var resend = new ResendParameters(
+            type: ResendType.SignUp,
+            email: email,
+            phone: null,
+            options: null
+        );
         await this.Api.Resend(resend);
 
         await this.Verify(this.EmittedRequestBody).UseDirectory("Data");
@@ -28,7 +33,12 @@ public class ResendParametersContractTests : RequestApprovalFixture
     public async Task ResendRequest_ShouldSerializeToExpectedPayload_GivenEmailChangeType()
     {
         const string email = "user@supabase.com";
-        var resend = new ResendParameters { Type = ResendType.EmailChange, Email = email };
+        var resend = new ResendParameters(
+            type: ResendType.EmailChange,
+            email: email,
+            phone: null,
+            options: null
+        );
         await this.Api.Resend(resend);
 
         await this.Verify(this.EmittedRequestBody).UseDirectory("Data");
@@ -37,11 +47,12 @@ public class ResendParametersContractTests : RequestApprovalFixture
     [TestMethod]
     public async Task ResendRequest_ShouldSerializeToExpectedPayload_GivenPhoneChangeType()
     {
-        var resend = new ResendParameters
-        {
-            Type = ResendType.PhoneChange,
-            Phone = "+5544998989898",
-        };
+        var resend = new ResendParameters(
+            type: ResendType.PhoneChange,
+            email: null,
+            phone: "+5544998989898",
+            options: null
+        );
         await this.Api.Resend(resend);
 
         await this.Verify(this.EmittedRequestBody).UseDirectory("Data");
@@ -50,7 +61,12 @@ public class ResendParametersContractTests : RequestApprovalFixture
     [TestMethod]
     public async Task ResendRequest_ShouldSerializeToExpectedPayload_GivenSmsType()
     {
-        var resend = new ResendParameters { Type = ResendType.Sms, Phone = "+5544998989898" };
+        var resend = new ResendParameters(
+            type: ResendType.Sms,
+            email: null,
+            phone: "+5544998989898",
+            options: null
+        );
         await this.Api.Resend(resend);
 
         await this.Verify(this.EmittedRequestBody).UseDirectory("Data");
@@ -59,12 +75,12 @@ public class ResendParametersContractTests : RequestApprovalFixture
     [TestMethod]
     public async Task ResendRequest_ShouldSerializeCaptchaToExpectedPayload_GivenOptions()
     {
-        var resend = new ResendParameters
-        {
-            Type = ResendType.SignUp,
-            Email = "user@supabase.com",
-            Options = new ResendOptions { CaptchaToken = "captcha-token" },
-        };
+        var resend = new ResendParameters(
+            type: ResendType.SignUp,
+            email: "user@supabase.com",
+            phone: null,
+            options: new ResendOptions(captchaToken: "captcha-token", emailRedirectTo: null)
+        );
 
         await this.Api.Resend(resend);
 

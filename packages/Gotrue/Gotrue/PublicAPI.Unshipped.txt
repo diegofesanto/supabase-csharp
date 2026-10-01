@@ -120,21 +120,15 @@ Supabase.Gotrue.Interfaces.IGotrueClient<TUser, TSession>.GetClaimsAsync(string?
 Supabase.Gotrue.Interfaces.IGotrueClient<TUser, TSession>.Resend(Supabase.Gotrue.Resend.ResendParameters! resendParameters) -> System.Threading.Tasks.Task<Supabase.Gotrue.Responses.BaseResponse!>!
 Supabase.Gotrue.Resend.ResendOptions
 Supabase.Gotrue.Resend.ResendOptions.CaptchaToken.get -> string?
-Supabase.Gotrue.Resend.ResendOptions.CaptchaToken.set -> void
 Supabase.Gotrue.Resend.ResendOptions.EmailRedirectTo.get -> string?
-Supabase.Gotrue.Resend.ResendOptions.EmailRedirectTo.set -> void
-Supabase.Gotrue.Resend.ResendOptions.ResendOptions() -> void
+Supabase.Gotrue.Resend.ResendOptions.ResendOptions(string? captchaToken, string? emailRedirectTo) -> void
 Supabase.Gotrue.Resend.ResendParameters
 Supabase.Gotrue.Resend.ResendParameters.Email.get -> string?
-Supabase.Gotrue.Resend.ResendParameters.Email.set -> void
-Supabase.Gotrue.Resend.ResendParameters.IsEmail() -> bool
 Supabase.Gotrue.Resend.ResendParameters.Options.get -> Supabase.Gotrue.Resend.ResendOptions?
-Supabase.Gotrue.Resend.ResendParameters.Options.set -> void
 Supabase.Gotrue.Resend.ResendParameters.Phone.get -> string?
-Supabase.Gotrue.Resend.ResendParameters.Phone.set -> void
-Supabase.Gotrue.Resend.ResendParameters.ResendParameters() -> void
+Supabase.Gotrue.Resend.ResendParameters.ResendParameters(Supabase.Gotrue.Resend.ResendType type, string? email, string? phone, Supabase.Gotrue.Resend.ResendOptions? options) -> void
+Supabase.Gotrue.Resend.ResendParameters.ToDictionary() -> System.Collections.Generic.Dictionary<string!, object!>!
 Supabase.Gotrue.Resend.ResendParameters.Type.get -> Supabase.Gotrue.Resend.ResendType
-Supabase.Gotrue.Resend.ResendParameters.Type.set -> void
 Supabase.Gotrue.Resend.ResendType
 Supabase.Gotrue.Resend.ResendType.EmailChange = 3 -> Supabase.Gotrue.Resend.ResendType
 Supabase.Gotrue.Resend.ResendType.PhoneChange = 2 -> Supabase.Gotrue.Resend.ResendType
