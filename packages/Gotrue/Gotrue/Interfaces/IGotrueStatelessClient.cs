@@ -172,6 +172,11 @@ public interface IGotrueStatelessClient<TUser, TSession>
     Task<TSession?> SignIn(SignInType type, string identifierOrToken, string? password = null, StatelessClientOptions? options = null);
 
     /// <summary>
+    /// Log in an existing user with an email or phone and password.
+    /// </summary>
+    Task<TSession?> SignIn(SignInType type, string identifierOrToken, string? password, StatelessClientOptions options, SignInWithPasswordOptions signInOptions);
+
+    /// <summary>
     /// Sends a Magic email login link to the specified email.
     /// </summary>
     /// <param name="email"></param>
@@ -198,6 +203,12 @@ public interface IGotrueStatelessClient<TUser, TSession>
     /// <param name="options"></param>
     /// <returns></returns>
     Task<bool> SignOut(string accessToken, StatelessClientOptions options);
+
+    /// <summary>
+    /// Signs out the user from the sessions in the given scope.
+    /// JWT tokens will still be valid for stateless auth until they expire.
+    /// </summary>
+    Task SignOut(string accessToken, StatelessClientOptions options, SignOutScope scope);
 
     /// <summary>
     /// Signs up a user
