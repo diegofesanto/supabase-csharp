@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
+        <TargetFramework>netstandard2.1</TargetFramework>
         <PackOnBuild>true</PackOnBuild>
         <PackageId>Supabase.Gotrue</PackageId>
         <PackageProjectUrl>https://github.com/supabase/supabase-csharp/tree/master/packages/Gotrue</PackageProjectUrl>
@@ -10,8 +11,8 @@
         <Description>Supabase Auth client for .NET covering email, phone and OAuth sign-in, magic links, MFA and session refresh.</Description>
         <PackageTags>supabase;auth;authentication;gotrue;jwt;oauth;mfa;pkce;sso</PackageTags>
         <!-- x-release-please-start-version -->
-        <PackageVersion>8.2.0</PackageVersion>
-        <ReleaseVersion>8.2.0</ReleaseVersion>
+        <PackageVersion>8.4.0</PackageVersion>
+        <ReleaseVersion>8.4.0</ReleaseVersion>
         <!-- x-release-please-end -->
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
@@ -29,7 +30,7 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Version)' == '' ">
-        <VersionPrefix Condition=" '$(VersionPrefix)' == '' ">8.2.0</VersionPrefix> <!-- x-release-please-version -->
+        <VersionPrefix Condition=" '$(VersionPrefix)' == '' ">8.4.0</VersionPrefix> <!-- x-release-please-version -->
         <VersionSuffix Condition=" '$(VersionSuffix)' == '' ">
         </VersionSuffix>
         <Version Condition=" '$(VersionSuffix)' != '' ">$(VersionPrefix)-$(VersionSuffix)</Version>

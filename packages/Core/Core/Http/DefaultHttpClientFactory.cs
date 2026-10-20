@@ -10,7 +10,15 @@ public static class DefaultHttpClientFactory
     /// <summary>Creates a client with the given timeout (BCL default, 100s, when null) and optional proxy.</summary>
     public static HttpClient Create(TimeSpan? timeout = null, IWebProxy? proxy = null)
     {
-        var handler = new HttpClientHandler { Proxy = proxy, UseProxy = proxy != null };
+        var handler = CreateHandler(proxy);
         return timeout.HasValue ? new HttpClient(handler) { Timeout = timeout.Value } : new HttpClient(handler);
+    }
+
+    internal static HttpClientHandler CreateHandler(IWebProxy? proxy)
+    {
+        var handler = new HttpClientHandler();
+        if (proxy != null)
+            handler.Proxy = proxy;
+        return handler;
     }
 }

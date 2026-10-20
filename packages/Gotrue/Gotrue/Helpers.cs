@@ -3,7 +3,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -40,6 +42,14 @@ public static class Helpers
     };
 
     private static readonly HttpClient Client = new HttpClient();
+
+    // One client per proxy, freed with it.
+    private static readonly ConditionalWeakTable<IWebProxy, HttpClient> ProxyClients = new();
+
+    /// <summary>The injected client, else the one for the proxy. Null means the shared default <see cref="Client"/>.</summary>
+    internal static HttpClient? ResolveHttpClient(HttpClient? httpClient, IWebProxy? proxy) =>
+        httpClient ?? (proxy != null ? ProxyClients.GetValue(proxy, p => DefaultHttpClientFactory.Create(proxy: p)) : null);
+
     /// <summary>
     /// Generates a nonce (code verifier)
     /// Used with PKCE flow and Apple/Google Sign in.
@@ -189,8 +199,18 @@ public static class Helpers
         where T : class
     {
         var baseResponse = await MakeRequestAsync(method, url, data, headers, httpClient, retry, cancellationToken);
-        return baseResponse.Content != null ? JsonSerializer.Deserialize<T>(baseResponse.Content, SerializerOptions) : default;
+        return baseResponse.Content != null ? DeserializeBody<T>(baseResponse) : default;
     }
+
+    /// <summary>
+    /// Deserializes a 2xx body and throws a GotrueException when it can't be read, e.g. a proxy's HTML page.
+    /// </summary>
+    internal static T? DeserializeBody<T>(BaseResponse response) =>
+        JsonBodyReader.Deserialize<T>(response.Content!, SerializerOptions, e => new GotrueException(e.Message, e)
+        {
+            Response = response.ResponseMessage,
+            StatusCode = (int) (response.ResponseMessage?.StatusCode ?? 0)
+        });
 
     /// <summary>
     /// Helper to make a request using the defined parameters to an API Endpoint.

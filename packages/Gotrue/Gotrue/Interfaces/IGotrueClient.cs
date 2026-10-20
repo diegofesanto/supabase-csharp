@@ -531,6 +531,19 @@ public interface IGotrueClient<TUser, TSession> : IGettableHeaders
     void Shutdown();
 
     /// <summary>
+    ///     Starts the background refresh, or resumes it after <see cref="StopAutoRefresh" />. Runs at
+    ///     construction when <see cref="ClientOptions.AutoRefreshToken" /> is set. Call it when the app
+    ///     returns to the foreground. An expired session is refreshed at once.
+    /// </summary>
+    void StartAutoRefresh();
+
+    /// <summary>
+    ///     Stops the background refresh until <see cref="StartAutoRefresh" />. The session is kept and a
+    ///     later sign-in does not restart the refresh. Call it when the app goes to the background.
+    /// </summary>
+    void StopAutoRefresh();
+
+    /// <summary>
     ///     Refreshes a Token using the current session.
     /// </summary>
     /// <returns></returns>
@@ -542,8 +555,7 @@ public interface IGotrueClient<TUser, TSession> : IGettableHeaders
     ///     the refresh token is one-time-use and never expires server-side, so it can mint a
     ///     new session even if the access token has long expired.
     ///     If the server rejects the refresh token, a
-    ///     <see cref="Exceptions.GotrueException" /> with reason
-    ///     <see cref="Exceptions.FailureHint.Reason.InvalidRefreshToken" /> is thrown, and the
+    ///     <see cref="Exceptions.GotrueException" /> with reason and the
     ///     session is destroyed if it is still the current one.
     /// </summary>
     /// <param name="accessToken">The access token to send as the bearer authorization.</param>

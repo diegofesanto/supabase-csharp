@@ -1,5 +1,62 @@
 # Changelog
 
+## [8.4.0](https://github.com/supabase/supabase-csharp/compare/v8.3.1...v8.4.0) (2026-10-16)
+
+
+### Features
+
+* **functions:** add SetAuth ([#510](https://github.com/supabase/supabase-csharp/issues/510)) ([32ab403](https://github.com/supabase/supabase-csharp/commit/32ab403ce9ac318283499496f1a776e3f5a6f7b0))
+* **gotrue:** add StartAutoRefresh and StopAutoRefresh ([#505](https://github.com/supabase/supabase-csharp/issues/505)) ([3ff0b95](https://github.com/supabase/supabase-csharp/commit/3ff0b95bcfc8bd4fef116991fab643c4551bf187))
+* **postgrest:** add a request timeout ([#512](https://github.com/supabase/supabase-csharp/issues/512)) ([ed0f93c](https://github.com/supabase/supabase-csharp/commit/ed0f93ca93e42053ba5c6685d7ef8f191f2d5df7))
+* **postgrest:** add StripNulls ([#509](https://github.com/supabase/supabase-csharp/issues/509)) ([b89c83e](https://github.com/supabase/supabase-csharp/commit/b89c83eba7f8eb98652252bc0c2db1f104f21628))
+* **postgrest:** report a 414 as UriTooLong ([#513](https://github.com/supabase/supabase-csharp/issues/513)) ([800777d](https://github.com/supabase/supabase-csharp/commit/800777d6e88b8a84d688cf214da743a412709150))
+* **storage:** add ListV2Async for paged listing ([#504](https://github.com/supabase/supabase-csharp/issues/504)) ([a83801b](https://github.com/supabase/supabase-csharp/commit/a83801bc1265e68ceb5b2c99680a169da5e8e94a))
+
+
+### Bug Fixes
+
+* **dependency-injection:** avoid setting proxy when it's null ([#503](https://github.com/supabase/supabase-csharp/issues/503)) ([611c6eb](https://github.com/supabase/supabase-csharp/commit/611c6ebae1788e1a382c606ede243ac75ad341f7))
+* **storage:** throw SupabaseStorageException when TusException has no response ([#508](https://github.com/supabase/supabase-csharp/issues/508)) ([ac9c67a](https://github.com/supabase/supabase-csharp/commit/ac9c67ace7f9609e1df93aba29b0a517e697fe94))
+
+## [8.3.1](https://github.com/supabase/supabase-csharp/compare/v8.3.0...v8.3.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **gotrue:** classify auth errors by error_code ([#431](https://github.com/supabase/supabase-csharp/issues/431)) ([4d61db6](https://github.com/supabase/supabase-csharp/commit/4d61db6d22a1f7d42356b1c0dea6aa58f8b190b2))
+* **gotrue:** reuse the HttpClient when a proxy is set ([#478](https://github.com/supabase/supabase-csharp/issues/478)) ([9993ea0](https://github.com/supabase/supabase-csharp/commit/9993ea0a236300952566b7611506924d4751c42a))
+* **gotrue:** throw a GotrueException for a non-JSON 2xx body ([#494](https://github.com/supabase/supabase-csharp/issues/494)) ([19ad898](https://github.com/supabase/supabase-csharp/commit/19ad89810641f1800c8ccae63d7b7e53daae5e5c))
+* **gotrue:** verify ES256 tokens on the server when the platform has no ECDsa ([#482](https://github.com/supabase/supabase-csharp/issues/482)) ([9b68791](https://github.com/supabase/supabase-csharp/commit/9b687918b31002fb7e8fd5632c0c1c9b400f3102))
+* **postgrest:** reuse the HttpClient when a proxy is set ([#477](https://github.com/supabase/supabase-csharp/issues/477)) ([8552e15](https://github.com/supabase/supabase-csharp/commit/8552e15e4faf1ca760f38a701716476f3093045a))
+* **realtime:** fail subscribe when the join times out ([#480](https://github.com/supabase/supabase-csharp/issues/480)) ([9b80ab2](https://github.com/supabase/supabase-csharp/commit/9b80ab27532474943843de153be37a0aea799171))
+* **realtime:** stop deserializing `postgres_change` into the typed payload ([#491](https://github.com/supabase/supabase-csharp/issues/491)) ([718313d](https://github.com/supabase/supabase-csharp/commit/718313d838fc8492ba1ebad39a742d807af5bf05))
+* **storage:** finish an empty resumable upload at the create ([#500](https://github.com/supabase/supabase-csharp/issues/500)) ([b68300d](https://github.com/supabase/supabase-csharp/commit/b68300d8e69e5c94dac5e1a4e641a98ab579b657))
+* **storage:** reuse the client's HttpClients in From ([#476](https://github.com/supabase/supabase-csharp/issues/476)) ([d122da0](https://github.com/supabase/supabase-csharp/commit/d122da080d2c19f044738bfb1ff76920be220734))
+* **storage:** throw a SupabaseStorageException for a non-JSON 2xx body ([#495](https://github.com/supabase/supabase-csharp/issues/495)) ([9ead331](https://github.com/supabase/supabase-csharp/commit/9ead331cc193e98ae96d9decfe61aee961fb27d0))
+* **storage:** throw when a resumable upload chunk is cancelled or fails ([#475](https://github.com/supabase/supabase-csharp/issues/475)) ([b298f95](https://github.com/supabase/supabase-csharp/commit/b298f95a22522ebbb922c3c51265bea7951e6880))
+
+## [8.3.0](https://github.com/supabase/supabase-csharp/compare/v8.2.0...v8.3.0) (2026-10-05)
+
+
+### Features
+
+* **gotrue:** add a captcha token to password sign-in ([#457](https://github.com/supabase/supabase-csharp/issues/457)) ([58ab7a4](https://github.com/supabase/supabase-csharp/commit/58ab7a4b92b15a404727ec7e306974eb6f26d3b8))
+* **gotrue:** add a captcha token to sign-up options ([#453](https://github.com/supabase/supabase-csharp/issues/453)) ([86be817](https://github.com/supabase/supabase-csharp/commit/86be81740c2e8d5992380d6af7e38d8a319868e4))
+* **gotrue:** add sign-out scope to the stateless client ([#447](https://github.com/supabase/supabase-csharp/issues/447)) ([437f5a5](https://github.com/supabase/supabase-csharp/commit/437f5a560ba3942d17b294667d127f51b374088a))
+
+
+### Bug Fixes
+
+* **core:** avoid setting proxy when it's null  ([#485](https://github.com/supabase/supabase-csharp/issues/485)) ([b6f942a](https://github.com/supabase/supabase-csharp/commit/b6f942a887c69323e1d56c5f4e67062e600bc4ae))
+* **functions:** return null from `Invoke<T>` for an empty body ([#462](https://github.com/supabase/supabase-csharp/issues/462)) ([ae23b98](https://github.com/supabase/supabase-csharp/commit/ae23b9837f9a15e718b80b26ef0e4f7cde01bd40))
+* **functions:** send the caller's content-type instead of dropping it ([#451](https://github.com/supabase/supabase-csharp/issues/451)) ([6690b0d](https://github.com/supabase/supabase-csharp/commit/6690b0d29aa83b9571aae41459f59ed71b32ed26))
+* **gotrue:** sign out locally even if the server call fails ([#448](https://github.com/supabase/supabase-csharp/issues/448)) ([b7a046b](https://github.com/supabase/supabase-csharp/commit/b7a046ba27d54b89e5451cbfd3142eea81ba78bd))
+* **postgrest:** throw a PostgrestException for a non-JSON 2xx body ([#459](https://github.com/supabase/supabase-csharp/issues/459)) ([5a815e6](https://github.com/supabase/supabase-csharp/commit/5a815e67724f3c4ad88e133513e2130ef70b7055))
+* **realtime:** skip unreadable json arrays instead of failing the record ([#449](https://github.com/supabase/supabase-csharp/issues/449)) ([16c0ab6](https://github.com/supabase/supabase-csharp/commit/16c0ab69bfbf9a66cc083db903c6047b922c5fcb))
+* **storage:** close the local file after a resumable upload ([#466](https://github.com/supabase/supabase-csharp/issues/466)) ([510c23c](https://github.com/supabase/supabase-csharp/commit/510c23c9e002704c1de911b40884852f69799362))
+* **storage:** use fresh headers on upload ([#468](https://github.com/supabase/supabase-csharp/issues/468)) ([7c72c13](https://github.com/supabase/supabase-csharp/commit/7c72c1357e05e75459c49e61d6b54c8fd69665f5))
+* **storage:** use per-request headers on uploads ([#470](https://github.com/supabase/supabase-csharp/issues/470)) ([aa15b97](https://github.com/supabase/supabase-csharp/commit/aa15b97766ea1a43b017db04dd5fdf2f6598349a))
+
 ## [8.2.0](https://github.com/supabase/supabase-csharp/compare/v8.1.1...v8.2.0) (2026-09-24)
 
 

@@ -2,6 +2,9 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+using System.Net;
+using System.Net.Http;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -22,7 +25,7 @@ namespace Storage.Tests.Files;
 /// Contract tests for the object-level HTTP calls a bucket's file API builds — list, info, signed
 /// URLs, move/copy, remove, byte upload/download — asserting each request's path, method and body,
 /// how responses are read (including the absolute URLs the SDK stitches onto signed paths), and that
-/// a missing signed URL or a non-JSON error surfaces a <see cref="SupabaseStorageException"/>.
+/// a missing signed URL or a non-JSON body surfaces a <see cref="SupabaseStorageException"/>.
 /// </summary>
 [TestClass]
 [TestCategory("Contract")]
@@ -58,6 +61,25 @@ public class StorageFileApiContractTests
             request.Method.Should().Be("POST");
             request.Path.Should().Be($"/storage/v1/object/list/{Bucket}");
             request.Body.Should().Contain("\"prefix\":\"folder\"").And.Contain("\"limit\":100");
+        }
+    }
+
+    [TestMethod]
+    public async Task ListV2Async_ShouldPostToTheListV2PathAndMapThePage()
+    {
+        this.Respond($"/storage/v1/object/list-v2/{Bucket}", "POST", 200,
+            "{\"hasNext\":true,\"nextCursor\":\"abc\",\"folders\":[{\"name\":\"folder/sub/\",\"key\":\"sub\"}],\"objects\":[{\"name\":\"folder/a.png\",\"id\":\"1\"}]}");
+        var page = await this.client.From(Bucket).ListV2Async(new SearchV2Options { Prefix = "folder/", WithDelimiter = true, Limit = 1 });
+        using (new AssertionScope())
+        {
+            var request = this.SingleRequest();
+            request.Path.Should().Be($"/storage/v1/object/list-v2/{Bucket}");
+            request.Body.Should().Contain("\"prefix\":\"folder/\"").And.Contain("\"with_delimiter\":true").And.Contain("\"limit\":1")
+                .And.NotContain("\"cursor\"").And.NotContain("\"sortBy\"");
+            page!.HasNext.Should().BeTrue();
+            page.NextCursor.Should().Be("abc");
+            page.Objects.Should().ContainSingle().Which.Name.Should().Be("folder/a.png");
+            page.Folders.Should().ContainSingle().Which.IsFolder.Should().BeTrue();
         }
     }
 
@@ -265,6 +287,26 @@ public class StorageFileApiContractTests
     }
 
     [TestMethod]
+    public async Task Upload_ShouldNotSendHeadersFromAnEarlierUpload()
+    {
+        var signedUrl = new UploadSignedUrl(
+            new Uri($"{this.server.Url}/storage/v1/object/upload/sign/{Bucket}/a.bin?token=abc"),
+            "abc",
+            "a.bin");
+        this.Respond($"/storage/v1/object/upload/sign/{Bucket}/a.bin", "POST", 200, "{\"Key\":\"x\"}");
+        this.Respond($"/storage/v1/object/{Bucket}/b.bin", "POST", 200, "{\"Key\":\"x\"}");
+        var bucket = this.client.From(Bucket);
+        await bucket.UploadToSignedUrl(new byte[] { 0x1 }, signedUrl, new FileOptions { Upsert = true });
+        await bucket.Upload(new byte[] { 0x1 }, "b.bin");
+        var request = this.server.LogEntries.Last().RequestMessage!;
+        using (new AssertionScope())
+        {
+            this.HeaderOf(request, "Authorization").Should().Be("Bearer test-key", "a signed upload's token must not replace the client's key on later uploads");
+            request.Headers.Should().NotContainKey("x-upsert", "an upsert on one upload must not make later uploads on the same bucket overwrite");
+        }
+    }
+
+    [TestMethod]
     public async Task Upload_ShouldReportProgress_GivenAProgressHandler()
     {
         this.Respond($"/storage/v1/object/{Bucket}/a.bin", "POST", 200, "{\"Key\":\"x\"}");
@@ -276,6 +318,23 @@ public class StorageFileApiContractTests
         (await Task.WhenAny(reported.Task, Task.Delay(2000))).Should().Be(reported.Task,
             "the upload must surface progress to the caller's handler");
         onProgress.Received().Invoke(Arg.Any<object>(), Arg.Any<float>());
+    }
+
+    [TestMethod]
+    public async Task Upload_ShouldNotPutHeadersOnTheSharedHttpClient()
+    {
+        using var injectedClient = new HttpClient();
+        injectedClient.DefaultRequestHeaders.Add("X-Injected", "true");
+        var storage = new Client($"{this.server.Url}/storage/v1", new ClientOptions { HttpUploadClient = injectedClient },
+            new Dictionary<string, string> { { "Authorization", "Bearer test-key" } });
+        this.Respond($"/storage/v1/object/{Bucket}/a.bin", "POST", 200, "{\"Key\":\"x\"}");
+        await storage.From(Bucket).Upload(new byte[] { 0x1 }, "a.bin");
+        using (new AssertionScope())
+        {
+            injectedClient.DefaultRequestHeaders.Select(header => header.Key).Should().Equal(new[] { "X-Injected" },
+                "an upload must not leave its headers on a client other uploads share (issue #469)");
+            this.SingleRequest().Headers.Should().ContainKey("X-Injected", "the caller's own default headers must still be sent (issue #469)");
+        }
     }
 
     [TestMethod]
@@ -393,6 +452,22 @@ public class StorageFileApiContractTests
     }
 
     [TestMethod]
+    public async Task List_ShouldSurfaceStorageException_GivenNonJsonSuccessBody()
+    {
+        const string body = "<html><body>502 Bad Gateway</body></html>";
+        this.server.Given(Request.Create().WithPath($"/storage/v1/object/list/{Bucket}").UsingPost())
+            .RespondWith(Response.Create().WithStatusCode(200).WithBody(body));
+        var act = () => this.client.From(Bucket).List();
+        var exception = (await act.Should().ThrowAsync<SupabaseStorageException>(
+            "storage-js reports a non-JSON 2xx body as a StorageUnknownError, not a raw parse error")).Which;
+        using (new AssertionScope())
+        {
+            exception.StatusCode.Should().Be(200);
+            exception.Content.Should().Be(body);
+        }
+    }
+
+    [TestMethod]
     public async Task UploadToSignedUrl_ShouldForwardMetadataAndCustomHeaders_GivenFileOptions()
     {
         var signedUrl = new UploadSignedUrl(
@@ -445,6 +520,48 @@ public class StorageFileApiContractTests
         {
             if (File.Exists(localPath))
                 File.Delete(localPath);
+        }
+    }
+
+    [TestMethod]
+    public async Task From_ShouldReuseTheConnection_GivenASecondCall()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var connections = 0;
+        _ = Task.Run(async () =>
+        {
+            while (true)
+            {
+                var connection = await listener.AcceptTcpClientAsync();
+                connections++;
+                _ = AnswerGetRequests(connection);
+            }
+        });
+        var storage = new Client($"http://127.0.0.1:{((IPEndPoint) listener.LocalEndpoint).Port}/storage/v1");
+
+        try
+        {
+            await storage.From(Bucket).Info("a.png");
+            await storage.From(Bucket).Info("a.png");
+
+            connections.Should().Be(1, "a new HttpClient per From call opens a new connection each time (issue #450)");
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    private static async Task AnswerGetRequests(TcpClient connection)
+    {
+        var stream = connection.GetStream();
+        using var reader = new StreamReader(stream);
+        while (await reader.ReadLineAsync() is { } line)
+        {
+            // A GET has no body, so the blank line ends the request.
+            if (line.Length == 0)
+                await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}"));
         }
     }
 

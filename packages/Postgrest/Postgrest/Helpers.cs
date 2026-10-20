@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -26,15 +27,20 @@ internal static class Helpers
 {
     private static readonly HttpClient Client = new HttpClient();
 
+    // One client per proxy object. It is freed when the proxy is.
+    private static readonly ConditionalWeakTable<IWebProxy, HttpClient> ProxyClients = new();
+
     private static readonly Guid AppSession = Guid.NewGuid();
 
     /// <summary>
     /// Resolves the client a request should be sent through, once per <see cref="Postgrest.Client"/>/<see cref="Table{TModel}"/>
-    /// construction: the caller-injected <see cref="ClientOptions.HttpClient"/>, else a proxy-configured client when
-    /// <see cref="ClientOptions.Proxy"/> is set, else null (callers fall back to the shared default <see cref="Client"/>).
+    /// construction: the caller-injected <see cref="ClientOptions.HttpClient"/>, else the client for
+    /// <see cref="ClientOptions.Proxy"/> when it is set, else null (callers fall back to the shared default <see cref="Client"/>).
     /// </summary>
     internal static HttpClient? ResolveHttpClient(ClientOptions options) =>
-        options.HttpClient ?? (options.Proxy != null ? DefaultHttpClientFactory.Create(proxy: options.Proxy) : null);
+        options.HttpClient ?? (options.Proxy != null
+            ? ProxyClients.GetValue(options.Proxy, proxy => DefaultHttpClientFactory.Create(proxy: proxy))
+            : null);
 
     /// <summary>
     /// Mirrors Newtonsoft's <c>JToken.HasValues</c>: true only when the serialized payload is a non-empty
@@ -141,9 +147,12 @@ internal static class Helpers
         int? statusCode = null;
         string? errorType = null;
 
+        using var timeoutCts = new CancellationTokenSource(clientOptions.Timeout ?? Timeout.InfiniteTimeSpan);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
         try
         {
-            using var response = await RetryExecutor.SendAsync(httpClient ?? Client, CreateRequest, clientOptions.Retry, cancellationToken).ConfigureAwait(false);
+            using var response = await RetryExecutor.SendAsync(httpClient ?? Client, CreateRequest, clientOptions.Retry, linkedCts.Token).ConfigureAwait(false);
             statusCode = (int) response.StatusCode;
             activity.SetHttpResponseTags(statusCode.Value);
 
@@ -162,6 +171,13 @@ internal static class Helpers
             exception.AddReason();
             throw exception;
         }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            var timeoutException = new TimeoutException($"The request timed out after {clientOptions.Timeout}.");
+            errorType = timeoutException.GetType().FullName;
+            activity.SetFailure(timeoutException);
+            throw new TaskCanceledException(timeoutException.Message, timeoutException, cancellationToken);
+        }
         catch (Exception e) when (e is not PostgrestException)
         {
             // Transport-level failures (no response); Postgrest surfaces these raw, so tag and rethrow.
@@ -174,6 +190,17 @@ internal static class Helpers
             PostgrestInstrumentation.RecordRequest(method, builder.Uri, operation, statusCode, errorType, startTimestamp);
         }
     }
+
+    /// <summary>
+    /// Deserializes a 2xx body and throws a PostgrestException when it can't be read, e.g. a proxy's HTML page.
+    /// </summary>
+    internal static T? DeserializeBody<T>(BaseResponse response, JsonSerializerOptions options) =>
+        JsonBodyReader.Deserialize<T>(response.Content!, options, e => new PostgrestException(response.Content, e)
+        {
+            Content = response.Content,
+            Response = response.ResponseMessage,
+            StatusCode = (int) (response.ResponseMessage?.StatusCode ?? 0)
+        });
 
     /// <summary>
     /// Prepares the request with appropriate HTTP headers expected by Postgrest.

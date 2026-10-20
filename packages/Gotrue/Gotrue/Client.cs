@@ -9,7 +9,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using Supabase.Core.Diagnostics;
-using Supabase.Core.Http;
 using Supabase.Gotrue.Claims;
 using Supabase.Gotrue.Exceptions;
 using Supabase.Gotrue.Interfaces;
@@ -108,18 +107,15 @@ public class Client : IGotrueClient<User, Session>
     {
         options ??= new ClientOptions();
         this.Options = options;
-        this.api = new Api(options.Url, options.Headers, options.HttpClient ?? (options.Proxy != null ? DefaultHttpClientFactory.Create(proxy: options.Proxy) : null), options.Retry);
+        this.api = new Api(options.Url, options.Headers, Helpers.ResolveHttpClient(options.HttpClient, options.Proxy), options.Retry);
         if (options.AutoRefreshToken)
-        {
-            this.TokenRefresh = new TokenRefresh(this);
-            this.authEventHandlers.Add(this.TokenRefresh.ManageAutoRefresh);
-        }
+            this.StartAutoRefresh();
     }
 
     /// <summary>
     ///     Get the TokenRefresh object, if it exists
     /// </summary>
-    public TokenRefresh? TokenRefresh { get; }
+    public TokenRefresh? TokenRefresh { get; private set; }
 
     /// <inheritdoc />
     public void SetPersistence(IGotrueSessionPersistence<Session> persistence) =>
@@ -750,7 +746,7 @@ public class Client : IGotrueClient<User, Session>
                 await this.RefreshToken();
                 return this.CurrentSession;
             }
-            catch (GotrueException e) when (e.Reason is InvalidRefreshToken)
+            catch (GotrueException e) when (IsDefinitiveRefreshRejection(e))
             {
                 // RefreshToken destroyed the session, unless it was replaced mid-flight.
                 activity.SetFailure(e);
@@ -823,7 +819,7 @@ public class Client : IGotrueClient<User, Session>
             this.SetCurrentSession(result);
             await this.NotifyAuthStateChangeAsync(TokenRefreshed).ConfigureAwait(false);
         }
-        catch (GotrueException ex) when (ex.Reason is InvalidRefreshToken)
+        catch (GotrueException ex) when (IsDefinitiveRefreshRejection(ex))
         {
             activity.SetFailure(ex);
             await this.ClearRejectedSessionAsync(refreshToken).ConfigureAwait(false);
@@ -899,7 +895,7 @@ public class Client : IGotrueClient<User, Session>
             }
             await this.NotifyAuthStateChangeAsync(TokenRefreshed).ConfigureAwait(false);
         }
-        catch (GotrueException ex) when (ex.Reason is InvalidRefreshToken)
+        catch (GotrueException ex) when (IsDefinitiveRefreshRejection(ex))
         {
             activity.SetFailure(ex);
             await this.ClearRejectedSessionAsync(refreshToken).ConfigureAwait(false);
@@ -987,6 +983,17 @@ public class Client : IGotrueClient<User, Session>
 
     /// <inheritdoc />
     public Task<BaseResponse> Resend(ResendParameters resendParameters) => this.api.Resend(resendParameters);
+
+    /// <inheritdoc />
+    public void StartAutoRefresh()
+    {
+        this.TokenRefresh ??= new TokenRefresh(this);
+        this.AddStateChangedListener(this.TokenRefresh.ManageAutoRefresh);
+        this.TokenRefresh.Start();
+    }
+
+    /// <inheritdoc />
+    public void StopAutoRefresh() => this.TokenRefresh?.Stop();
 
     /// <inheritdoc />
     public async Task<MfaEnrollResponse?> Enroll(MfaEnrollParams mfaEnrollParams)
@@ -1178,7 +1185,7 @@ public class Client : IGotrueClient<User, Session>
     /// </summary>
     private async Task<Jwk?> FindSigningKeyAsync(string? alg, string? kid, Jwks? suppliedKeys, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(kid) || alg is not ("RS256" or "ES256"))
+        if (string.IsNullOrEmpty(kid) || !JwtVerification.CanVerify(alg))
         {
             return null;
         }
@@ -1240,6 +1247,12 @@ public class Client : IGotrueClient<User, Session>
             await this.NotifyAuthStateChangeAsync(stateChanged, cancellationToken).ConfigureAwait(false);
         }
     }
+
+    // A refresh the server answers with a client error (4xx other than rate limiting) will never succeed
+    // with that token, so the session it belonged to is definitively rejected. Transient failures -
+    // offline, network, 5xx, rate limiting - keep the session so the next refresh can retry.
+    private static bool IsDefinitiveRefreshRejection(GotrueException ex) =>
+        ex.StatusCode is >= 400 and < 500 and not 429;
 
     // Only signs out the session the token belonged to.
     private async Task ClearRejectedSessionAsync(string refreshToken)

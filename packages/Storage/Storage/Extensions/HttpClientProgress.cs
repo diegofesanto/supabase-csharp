@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using BirdMessenger;
@@ -195,17 +196,16 @@ internal static class HttpClientProgress
     )
     {
         var content = new ProgressableStreamContent(stream, 4096, progress);
+        var request = new HttpRequestMessage(HttpMethod.Post, uri) { Content = content };
 
         if (headers != null)
         {
-            client.DefaultRequestHeaders.Clear();
-
             foreach (var header in headers)
             {
                 if (header.Key.Contains("content"))
                     content.Headers.Add(header.Key, header.Value);
                 else
-                    client.DefaultRequestHeaders.Add(header.Key, header.Value);
+                    request.Headers.Add(header.Key, header.Value);
             }
         }
 
@@ -217,7 +217,7 @@ internal static class HttpClientProgress
 
         try
         {
-            var response = await client.PostAsync(uri, content, cancellationToken);
+            var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
             statusCode = (int) response.StatusCode;
             activity.SetHttpResponseTags(statusCode.Value);
 
@@ -315,12 +315,14 @@ internal static class HttpClientProgress
             fileStream.Seek(0, SeekOrigin.Begin);
         }
 
+        // Copied and validated up front, not in AddHeaders: BirdMessenger swallows exceptions from that
+        // callback, and the caller's dictionary can change during a long upload.
+        var uploadHeaders = new HttpRequestMessage().Headers;
         if (headers != null)
         {
-            client.DefaultRequestHeaders.Clear();
             foreach (var header in headers)
             {
-                client.DefaultRequestHeaders.Add(header.Key, header.Value);
+                uploadHeaders.Add(header.Key, header.Value);
             }
         }
 
@@ -338,7 +340,11 @@ internal static class HttpClientProgress
             var cacheKey =
                 $"{metadata["bucketName"]}/{metadata["objectName"]}/{metadata["contentType"]}";
 
-            UploadMemoryCache.TryGet(cacheKey, out var upload);
+            // An empty upload is complete once created, so it never resumes and BirdMessenger sends no PATCH.
+            var empty = fileStream.Length == 0;
+            string? upload = null;
+            if (!empty)
+                UploadMemoryCache.TryGet(cacheKey, out upload);
             Uri? fileLocation = null;
             if (upload == null)
             {
@@ -347,6 +353,7 @@ internal static class HttpClientProgress
                     Endpoint = uri,
                     Metadata = metadata,
                     UploadLength = fileStream.Length,
+                    OnPreSendRequestAsync = AddHeaders,
                 };
 
                 try
@@ -356,10 +363,17 @@ internal static class HttpClientProgress
                         cancellationToken
                     );
 
+                    if (empty)
+                    {
+                        statusCode = (int) responseCreate.OriginResponseMessage.StatusCode;
+                        activity.SetHttpResponseTags(statusCode.Value);
+                        return responseCreate.OriginResponseMessage;
+                    }
+
                     fileLocation = responseCreate.FileLocation;
                     UploadMemoryCache.Set(cacheKey, fileLocation.ToString());
                 }
-                catch (TusException error)
+                catch (TusException error) when (error.OriginHttpResponse != null)
                 {
                     statusCode = (int) error.OriginHttpResponse.StatusCode;
                     errorType = statusCode.Value.ToString();
@@ -371,6 +385,8 @@ internal static class HttpClientProgress
             if (upload != null)
                 fileLocation = new Uri(upload);
 
+            // BirdMessenger reports chunk failures only through OnFailedAsync, and stops quietly on cancel.
+            Exception? failure = null;
             var patchOption = new TusPatchRequestOption
             {
                 FileLocation = fileLocation,
@@ -383,14 +399,24 @@ internal static class HttpClientProgress
                     UploadMemoryCache.Remove(cacheKey);
                     return Task.CompletedTask;
                 },
-                OnFailedAsync = _ => Task.CompletedTask,
+                OnFailedAsync = x =>
+                {
+                    failure = x.Exception;
+                    return Task.CompletedTask;
+                },
+                OnPreSendRequestAsync = AddHeaders,
             };
 
             var responsePatch = await client.TusPatchAsync(patchOption, cancellationToken);
+            if (failure != null && !(failure is TusException { OriginHttpResponse: not null }))
+                ExceptionDispatchInfo.Capture(failure).Throw();
+            if (responsePatch.UploadedSize != fileStream.Length)
+                cancellationToken.ThrowIfCancellationRequested();
+
             statusCode = (int) responsePatch.OriginResponseMessage.StatusCode;
             activity.SetHttpResponseTags(statusCode.Value);
 
-            if (responsePatch.OriginResponseMessage.IsSuccessStatusCode)
+            if (failure == null && responsePatch.OriginResponseMessage.IsSuccessStatusCode)
                 return responsePatch.OriginResponseMessage;
 
             errorType = statusCode.Value.ToString();
@@ -400,11 +426,23 @@ internal static class HttpClientProgress
         {
             errorType = e.GetType().FullName;
             activity.SetFailure(e);
+            // BirdMessenger reports a missing header, such as Location on the create reply, with a
+            // TusException that has no response.
+            if (e is TusException tus)
+                throw new SupabaseStorageException($"The resumable upload failed: {tus.Message}.", tus);
             throw;
         }
         finally
         {
             StorageInstrumentation.RecordTransfer(StorageInstrumentation.DirectionUpload, HttpMethod.Post, uri, bytes, statusCode, errorType, startTimestamp);
+        }
+
+        Task AddHeaders(PreSendRequestEvent preSend)
+        {
+            foreach (var header in uploadHeaders)
+                preSend.HttpRequestMsg.Headers.Add(header.Key, header.Value);
+
+            return Task.CompletedTask;
         }
     }
 
