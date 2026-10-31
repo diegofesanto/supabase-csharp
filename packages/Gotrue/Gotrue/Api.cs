@@ -9,6 +9,7 @@ using Supabase.Core;
 using Supabase.Core.Extensions;
 using Supabase.Core.Http;
 using Supabase.Gotrue.Claims;
+using Supabase.Gotrue.CustomProviders;
 using Supabase.Gotrue.Exceptions;
 using Supabase.Gotrue.Interfaces;
 using Supabase.Gotrue.Mfa;
@@ -887,7 +888,12 @@ public class Api : IGotrueApi<User, Session>
             { "refresh_token", refreshToken }
         };
 
-        return this.MakeRequestAsync<Session>(HttpMethod.Post, $"{this.Url}/token?grant_type=refresh_token", data, this.Headers.MergeLeft(headers));
+        return this.MakeRequestAsync<Session>(
+            HttpMethod.Post,
+            $"{this.Url}/token?grant_type=refresh_token",
+            data,
+            this.Headers.MergeLeft(headers)
+        );
     }
 
     /// <summary>
@@ -900,11 +906,68 @@ public class Api : IGotrueApi<User, Session>
         var body = resendParameters.ToDictionary();
         var url = resendParameters.ApplyRedirectTo(this.Url);
 
-        return this.MakeRequestAsync(
+        return this.MakeRequestAsync(HttpMethod.Post, url, body, this.Headers);
+    }
+
+    /// <inheritdoc />
+    public Task<CustomProvider?> CreateCustomProvider(string jwt, CreateCustomProvider provider)
+    {
+        var payload = provider.ToDictionary();
+
+        return this.MakeRequestAsync<CustomProvider>(
             HttpMethod.Post,
-            url,
-            body,
-            this.Headers
+            $"{this.Url}/admin/custom-providers",
+            payload,
+            this.CreateAuthedRequestHeaders(jwt)
+        );
+    }
+
+    /// <inheritdoc />
+    public Task<CustomProvider?> UpdateCustomProvider(
+        string jwt,
+        string identifier,
+        UpdateCustomProvider provider
+    ) =>
+        this.MakeRequestAsync<CustomProvider>(
+            HttpMethod.Put,
+            $"{this.Url}/admin/custom-providers/{identifier}",
+            provider,
+            this.CreateAuthedRequestHeaders(jwt)
+        );
+
+    /// <inheritdoc />
+    public Task<BaseResponse> DeleteCustomProvider(string jwt, string identifier) =>
+        this.MakeRequestAsync(
+            HttpMethod.Delete,
+            $"{this.Url}/admin/custom-providers/{identifier}",
+            null,
+            this.CreateAuthedRequestHeaders(jwt)
+        );
+
+    /// <inheritdoc />
+    public Task<CustomProvider?> GetCustomProvider(string jwt, string identifier) =>
+        this.MakeRequestAsync<CustomProvider>(
+            HttpMethod.Get,
+            $"{this.Url}/admin/custom-providers/{identifier}",
+            null,
+            this.CreateAuthedRequestHeaders(jwt)
+        );
+
+    /// <inheritdoc />
+    public Task<ListCustomProviderResponse?> ListCustomProvider(
+        string jwt,
+        ListCustomProviderParameter? parameter
+    )
+    {
+        var newUrl = $"{this.Url}/admin/custom-providers";
+        if (parameter?.Type != null)
+            newUrl = $"{newUrl}?type={Core.Helpers.GetMappedToAttr(parameter.Type).Mapping}";
+
+        return this.MakeRequestAsync<ListCustomProviderResponse>(
+            HttpMethod.Get,
+            newUrl,
+            null,
+            this.CreateAuthedRequestHeaders(jwt)
         );
     }
 }

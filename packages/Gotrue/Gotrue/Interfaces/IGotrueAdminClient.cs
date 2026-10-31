@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Supabase.Core.Interfaces;
+using Supabase.Gotrue.CustomProviders;
 using Supabase.Gotrue.Mfa;
 using Supabase.Gotrue.Responses;
 
@@ -69,8 +70,13 @@ public interface IGotrueAdminClient<TUser> : IGettableHeaders
     /// <param name="page">page to show for pagination</param>
     /// <param name="perPage">items per page for pagination</param>
     /// <returns></returns>
-    Task<UserList<TUser>?> ListUsers(string? filter = null, string? sortBy = null, Constants.SortOrder sortOrder = Constants.SortOrder.Descending, int? page = null,
-        int? perPage = null);
+    Task<UserList<TUser>?> ListUsers(
+        string? filter = null,
+        string? sortBy = null,
+        Constants.SortOrder sortOrder = Constants.SortOrder.Descending,
+        int? page = null,
+        int? perPage = null
+    );
 
     /// <summary>
     /// Updates a User using the service key
@@ -107,4 +113,35 @@ public interface IGotrueAdminClient<TUser> : IGettableHeaders
     /// <param name="listFactorParams">A <see cref="MfaAdminListFactorsParams"/> object that contains the user id.</param>
     /// <returns>A <see cref="MfaAdminDeleteFactorResponse"/> containing the deleted factor id.</returns>
     Task<MfaAdminDeleteFactorResponse?> DeleteFactor(MfaAdminDeleteFactorParams deleteFactorParams);
+
+    /// <summary>
+    /// Create a new custom OIDC/OAuth provider.
+    /// </summary>
+    /// <param name="provider">Custom provider parameters</param>
+    Task<CustomProvider?> CreateCustomProvider(CreateCustomProvider provider);
+
+    /// <summary>
+    /// Update an existing custom OIDC/OAuth provider.
+    /// </summary>
+    /// <param name="identifier">Identifier (custom:mycompany)</param>
+    /// <param name="provider">Custom provider parameters</param>
+    Task<CustomProvider?> UpdateCustomProvider(string identifier, UpdateCustomProvider provider);
+
+    /// <summary>
+    /// Delete an existing custom OIDC/OAuth provider.
+    /// </summary>
+    /// <param name="identifier">identifier for provider (custom:mycompany)</param>
+    Task<BaseResponse> DeleteCustomProvider(string identifier);
+
+    /// <summary>
+    /// Get an existing custom OIDC/OAuth provider.
+    /// </summary>
+    /// <param name="identifier">identifier for provider (custom:mycompany)</param>
+    Task<CustomProvider?> GetCustomProvider(string identifier);
+
+    /// <summary>
+    /// Get all existing custom OIDC/OAuth providers.
+    /// </summary>
+    /// <param name="paramater">Filter to get the list</param>
+    Task<ListCustomProviderResponse?> ListCustomProvider(ListCustomProviderParameter? paramater);
 }

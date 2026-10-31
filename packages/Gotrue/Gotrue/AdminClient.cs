@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Supabase.Core.Attributes;
+using Supabase.Gotrue.CustomProviders;
 using Supabase.Gotrue.Interfaces;
 using Supabase.Gotrue.Mfa;
 using Supabase.Gotrue.Responses;
@@ -22,7 +23,7 @@ public class AdminClient : IGotrueAdminClient<User>
     public ClientOptions Options { get; }
 
     /// <summary>
-    /// Initialize the client with a service key. 
+    /// Initialize the client with a service key.
     /// </summary>
     /// <param name="serviceKey">A valid JWT. Must be a full-access API key (e.g. 'service_role' or 'supabase_admin'). </param>
     /// <param name="options"></param>
@@ -140,6 +141,46 @@ public class AdminClient : IGotrueAdminClient<User>
     public async Task<User?> Update(UserAttributes attributes)
     {
         var result = await this.api.UpdateUser(this.serviceKey, attributes);
+        return result;
+    }
+
+    /// <inheritdoc />
+    public async Task<CustomProvider?> CreateCustomProvider(CreateCustomProvider provider)
+    {
+        var result = await this.api.CreateCustomProvider(this.serviceKey, provider);
+        return result;
+    }
+
+    /// <inheritdoc />
+    public async Task<CustomProvider?> UpdateCustomProvider(
+        string identifier,
+        UpdateCustomProvider provider
+    )
+    {
+        var result = await this.api.UpdateCustomProvider(this.serviceKey, identifier, provider);
+        return result;
+    }
+
+    /// <inheritdoc />
+    public async Task<BaseResponse> DeleteCustomProvider(string identifier)
+    {
+        var result = await this.api.DeleteCustomProvider(this.serviceKey, identifier);
+        return result;
+    }
+
+    /// <inheritdoc />
+    public async Task<CustomProvider?> GetCustomProvider(string identifier)
+    {
+        var result = await this.api.GetCustomProvider(this.serviceKey, identifier);
+        return result;
+    }
+
+    /// <inheritdoc />
+    public Task<ListCustomProviderResponse?> ListCustomProvider(
+        ListCustomProviderParameter? paramater
+    )
+    {
+        var result = this.api.ListCustomProvider(this.serviceKey, paramater);
         return result;
     }
 }

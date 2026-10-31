@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Supabase.Core.Interfaces;
 using Supabase.Gotrue.Claims;
+using Supabase.Gotrue.CustomProviders;
 using Supabase.Gotrue.Mfa;
 using Supabase.Gotrue.Resend;
 using Supabase.Gotrue.Responses;
@@ -95,4 +96,47 @@ public interface IGotrueApi<TUser, TSession> : IGettableHeaders
     /// <param name="resendParameters"></param>
     /// <returns></returns>
     Task<BaseResponse> Resend(ResendParameters resendParameters);
+
+    /// <summary>
+    /// Create a new custom OIDC/OAuth provider.
+    /// </summary>
+    /// <param name="jwt">User's token</param>
+    /// <param name="provider">Custom provider parameters</param>
+    Task<CustomProvider?> CreateCustomProvider(string jwt, CreateCustomProvider provider);
+
+    /// <summary>
+    /// Update an existing custom OIDC/OAuth provider.
+    /// </summary>
+    /// <param name="jwt">User's token</param>
+    /// <param name="identifier">Identifier (custom:mycompany)</param>
+    /// <param name="provider">Custom provider parameters</param>
+    Task<CustomProvider?> UpdateCustomProvider(
+        string jwt,
+        string identifier,
+        UpdateCustomProvider provider
+    );
+
+    /// <summary>
+    /// Delete an existing custom OIDC/OAuth provider.
+    /// </summary>
+    /// <param name="jwt">User's token</param>
+    /// <param name="identifier">identifier for provider (custom:mycompany)</param>
+    Task<BaseResponse> DeleteCustomProvider(string jwt, string identifier);
+
+    /// <summary>
+    /// Get an existing custom OIDC/OAuth provider.
+    /// </summary>
+    /// <param name="jwt">User's token</param>
+    /// <param name="identifier">identifier for provider (custom:mycompany)</param>
+    Task<CustomProvider?> GetCustomProvider(string jwt, string identifier);
+
+    /// <summary>
+    /// Get all existing custom OIDC/OAuth providers.
+    /// </summary>
+    /// <param name="jwt">User's token</param>
+    /// <param name="paramater">Filter to get the list</param>
+    Task<ListCustomProviderResponse?> ListCustomProvider(
+        string jwt,
+        ListCustomProviderParameter? paramater
+    );
 }
