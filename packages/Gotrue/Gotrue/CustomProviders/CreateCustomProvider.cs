@@ -3,131 +3,111 @@ using System.Text.Json.Serialization;
 
 namespace Supabase.Gotrue.CustomProviders;
 
-public class CreateCustomProvider
+public record class CreateCustomProvider
 {
     /// <summary>
     /// Provider type
     /// </summary>
-    [JsonPropertyName("provider_type")]
-    public CustomProviderType CustomProviderType { get; set; }
+    public CustomProviderType CustomProviderType { get; init; }
 
     /// <summary>
     /// Provider identifier (e. g. custom:mycompany)
     /// </summary>
-    [JsonPropertyName("identifier")]
-    public string Identifier { get; set; }
+    public string Identifier { get; init; }
 
     /// <summary>
     /// Human readable name
     /// </summary>
-    [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string Name { get; init; }
 
     /// <summary>
     /// OAuth client ID
     /// </summary>
-    [JsonPropertyName("client_id")]
-    public string ClientId { get; set; }
+    public string ClientId { get; init; }
 
     /// <summary>
     /// OAuth client secret (write-only, not returned in response)
     /// </summary>
-    [JsonPropertyName("client_secret")]
-    public string ClientSecret { get; set; }
+    public string ClientSecret { get; init; }
 
     /// <summary>
     /// Additional client IDs accepted during token validation
     /// </summary>
-    [JsonPropertyName("acceptable_client_ids")]
-    public List<string>? AcceptableClientIDs { get; set; }
+    public List<string>? AcceptableClientIDs { get; init; }
 
     /// <summary>
     /// OAuth scopes requested during authorization
     /// </summary>
-    [JsonPropertyName("scopes")]
-    public List<string>? Scopes { get; set; }
+    public List<string>? Scopes { get; init; }
 
     /// <summary>
     /// Allowlist of raw identity provider claim keys to copy verbatim into user's
     /// </summary>
-    [JsonPropertyName("custom_claims_allowlist")]
-    public List<string>? CustomClaimsAllowList { get; set; }
+    public List<string>? CustomClaimsAllowList { get; init; }
 
     /// <summary>
     /// Whether PKCE is enabled
     /// </summary>
-    [JsonPropertyName("pkce_enabled")]
-    public bool? PkceEnabled { get; set; }
+    public bool? PkceEnabled { get; init; }
 
     /// <summary>
     /// Mapping of provider attributes to Supabase user attribute
     /// </summary>
-    [JsonPropertyName("attribute_mapping")]
-    public Dictionary<string, object>? AttributeMapping { get; set; }
+    public Dictionary<string, object>? AttributeMapping { get; init; }
 
     /// <summary>
     /// Additional parameters sent with the authrozation request
     /// </summary>
-    [JsonPropertyName("authorization_params")]
-    public Dictionary<string, string>? AuthorizationParameters { get; set; }
+    public Dictionary<string, string>? AuthorizationParameters { get; init; }
 
     /// <summary>
     /// Whether the provider is enabled
     /// </summary>
-    [JsonPropertyName("enabled")]
-    public bool? Enabled { get; set; }
+    public bool? Enabled { get; init; }
 
     /// <summary>
     /// Whether email is optional for this provider
     /// </summary>
-    [JsonPropertyName("email_optional")]
-    public bool? EmailOptional { get; set; }
+    public bool? EmailOptional { get; init; }
 
     /// <summary>
     /// OIDC issuer URL
     /// </summary>
-    [JsonPropertyName("issuer")]
-    public string? Issuer { get; set; }
+    public string? Issuer { get; init; }
 
     /// <summary>
     /// OIDC discovery url
     /// </summary>
-    [JsonPropertyName("discovery_url")]
-    public string? DiscoveryUrl { get; set; }
+    public string? DiscoveryUrl { get; init; }
 
     /// <summary>
     /// Whether to skip nonce check (OIDC)
     /// </summary>
-    [JsonPropertyName("skip_nonce_check")]
-    public bool? SkipNonceCheck { get; set; }
+    public bool? SkipNonceCheck { get; init; }
 
     /// <summary>
     /// OAuth2 authorization url
     /// </summary>
-    [JsonPropertyName("authorization_url")]
-    public string? AuthorizationUrl { get; set; }
+    public string? AuthorizationUrl { get; init; }
 
     /// <summary>
     /// OAuth2 token URL
     /// </summary>
-    [JsonPropertyName("token_url")]
-    public string? TokenUrl { get; set; }
+    public string? TokenUrl { get; init; }
 
     /// <summary>
     /// OAuth2 userinfo URL
     /// </summary>
-    [JsonPropertyName("userinfo_url")]
-    public string? UserinfoUrl { get; set; }
+    public string? UserinfoUrl { get; init; }
 
     /// <summary>
     /// JWKS Uri for token verification
     /// </summary>
-    [JsonPropertyName("jwks_uri")]
-    public string? JwksUri { get; set; }
+    public string? JwksUri { get; init; }
 
-    internal Dictionary<string, object> ToDictionary()
+    internal Dictionary<string, object?> ToDictionary()
     {
-        var payload = new Dictionary<string, object>
+        var payload = new Dictionary<string, object?>
         {
             { "provider_type", Core.Helpers.GetMappedToAttr(this.CustomProviderType).Mapping },
             { "identifier", this.Identifier },

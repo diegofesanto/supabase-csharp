@@ -7,7 +7,7 @@ namespace Supabase.Gotrue.CustomProviders;
 /// <summary>
 ///     Represents a custom provider for authentication.
 /// </summary>
-public class CustomProvider
+public record class CustomProvider
 {
     /// <summary>
     /// Unique identifier (UUID)

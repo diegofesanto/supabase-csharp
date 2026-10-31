@@ -4,11 +4,11 @@ using System.Text.Json.Serialization;
 namespace Supabase.Gotrue.CustomProviders;
 
 /// <summary>
-/// Parameters for updating an exisint custom provider
+/// Parameters for updating an existed custom provider
 /// All fields are optionals
 /// ProviderType and Identifier are immutable and cannot be changed.
 /// </summary>
-public class UpdateCustomProvider
+public record class UpdateCustomProvider
 {
     /// <summary>
     /// Human readable name

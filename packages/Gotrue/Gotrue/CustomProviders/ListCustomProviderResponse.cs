@@ -6,7 +6,7 @@ namespace Supabase.Gotrue.CustomProviders;
 /// <summary>
 /// Response type for Custom Providers
 /// </summary>
-public class ListCustomProviderResponse
+public record class ListCustomProviderResponse
 {
     /// <summary>
     /// Response

@@ -123,23 +123,24 @@ public class CustomProviderContractTest : RequestApprovalFixture
 
     private static CreateCustomProvider CreateOptionalParameters(CreateCustomProvider provider, List<string> scopes)
     {
-        provider.AcceptableClientIDs = ["Secret", "Secret1"];
-        provider.Scopes = scopes;
-        provider.CustomClaimsAllowList = ["claims"];
-        provider.PkceEnabled = false;
-        provider.AttributeMapping = new Dictionary<string, object> { { "key", "value" } };
-        provider.AuthorizationParameters = new Dictionary<string, string> { { "key", "value" } };
-        provider.Enabled = true;
-        provider.EmailOptional = true;
-        provider.Issuer ??= "https://batrpyimgiqfewsdkfll.supabase.co";
-        provider.DiscoveryUrl ??= "https://batrpyimgiqfewsdkfll.supabase.co";
-        provider.SkipNonceCheck = false;
-        provider.AuthorizationUrl ??= "https://batrpyimgiqfewsdkfll.supabase.co";
-        provider.TokenUrl ??= "https://batrpyimgiqfewsdkfll.supabase.co";
-        provider.UserinfoUrl ??= "https://batrpyimgiqfewsdkfll.supabase.co";
-        provider.JwksUri = "https://batrpyimgiqfewsdkfll.supabase.co";
-
-        return provider;
+        return provider with
+        {
+            AcceptableClientIDs = ["Secret", "Secret1"],
+            Scopes = scopes,
+            CustomClaimsAllowList = ["claims"],
+            PkceEnabled = false,
+            AttributeMapping = new Dictionary<string, object> { { "key", "value" } },
+            AuthorizationParameters = new Dictionary<string, string> { { "key", "value" } },
+            Enabled = true,
+            EmailOptional = true,
+            Issuer = provider.Issuer ?? "https://batrpyimgiqfewsdkfll.supabase.co",
+            DiscoveryUrl = provider.DiscoveryUrl ?? "https://batrpyimgiqfewsdkfll.supabase.co",
+            SkipNonceCheck = false,
+            AuthorizationUrl = provider.AuthorizationUrl ?? "https://batrpyimgiqfewsdkfll.supabase.co",
+            TokenUrl = provider.TokenUrl ?? "https://batrpyimgiqfewsdkfll.supabase.co",
+            UserinfoUrl = provider.UserinfoUrl ?? "https://batrpyimgiqfewsdkfll.supabase.co",
+            JwksUri = "https://batrpyimgiqfewsdkfll.supabase.co",
+        };
     }
 
     private static CustomProvider CreateExistingOAuthProvider() => new()

@@ -6,7 +6,7 @@ namespace Supabase.Gotrue.CustomProviders;
 /// <summary>
 /// Represents the discovery document obtained from an OpenId Connect (OIDC)
 /// </summary>
-public class OIDCDiscoveryDocument
+public record class OIDCDiscoveryDocument
 {
     /// <summary>
     /// Issuer identifier
