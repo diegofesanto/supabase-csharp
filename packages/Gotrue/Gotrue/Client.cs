@@ -119,7 +119,8 @@ public class Client : IGotrueClient<User, Session>
         this.api = new Api(options.Url, options.Headers, Helpers.ResolveHttpClient(options.HttpClient, options.Proxy), options.Retry)
         {
             TracePropagation = options.TracePropagation,
-            Logger = options.Logger
+            Logger = options.Logger,
+            TimeProvider = options.TimeProvider
         };
         if (options.AutoRefreshToken)
             this.StartAutoRefresh();
@@ -914,7 +915,7 @@ public class Client : IGotrueClient<User, Session>
     }
 
     /// <inheritdoc />
-    [Obsolete("The debug listener is replaced by OpenTelemetry-compatible diagnostics: subscribe to the ActivitySource and Meter named \"Supabase.Gotrue\". This member will be removed in v8.")]
+    [Obsolete("The debug listener is replaced by OpenTelemetry-compatible diagnostics: subscribe to the ActivitySource and Meter named \"supabase.gotrue\". This member will be removed in v8.")]
     public void AddDebugListener(Action<string, Exception?> listener)
     {
 #pragma warning disable CS0618 // internal plumbing for the obsolete debug surface, removed together in v8

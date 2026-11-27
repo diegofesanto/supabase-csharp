@@ -157,8 +157,8 @@ public class SupabaseOptions
     public IWebSocketFactory? WebSocketFactory { get; set; }
 
     /// <summary>
-    /// Whether the SDK adds the current trace context (<c>traceparent</c>, <c>tracestate</c>, <c>baggage</c>) to each request it
-    /// sends. Defaults to <see cref="Supabase.Core.Http.TracePropagation.Enabled"/>; <see cref="Supabase.Core.Http.TracePropagation.Disabled"/> stops the SDK from
+    /// Whether the SDK adds trace context (<c>traceparent</c>, <c>tracestate</c>, <c>baggage</c>) to each request it
+    /// sends: the current activity's, or a new unsampled <c>traceparent</c> when there is none. Defaults to <see cref="Supabase.Core.Http.TracePropagation.Enabled"/>; <see cref="Supabase.Core.Http.TracePropagation.Disabled"/> stops the SDK from
     /// injecting it, and the .NET runtime's own injection is controlled through
     /// <see cref="System.Diagnostics.DistributedContextPropagator.Current"/>. Passed to the Auth, Database, Storage and Edge
     /// Functions clients; Realtime does not propagate trace context.
@@ -173,10 +173,27 @@ public class SupabaseOptions
     public Supabase.Core.Http.TracePropagation TracePropagation { get; set; } = Supabase.Core.Http.TracePropagation.Enabled;
 
     /// <summary>
+    /// The clock every sub-client's timers, delays and timeouts wait on: the Auth refresh timer, retry backoff, the
+    /// Database and Edge Functions request timeouts, and the Realtime heartbeat, push timeouts, channel rejoin, reconnect
+    /// and disconnect delays. Defaults to <see cref="System.TimeProvider.System"/>; supply another provider to run them
+    /// from a host's own timers, such as a frame loop where OS timers never fire. When set, it replaces the
+    /// <see cref="StorageClientOptions"/> clock.
+    /// </summary>
+    /// <remarks>
+    /// Whether a session is due for refresh is still measured against the system clock, as is the HTTP timeout of Storage.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var client = new Supabase.Client(url, key, new SupabaseOptions { TimeProvider = frameLoopClock });
+    /// </code>
+    /// </example>
+    public TimeProvider TimeProvider { get; set; } = TimeProvider.System;
+
+    /// <summary>
     /// Receives the diagnostics of every sub-client: request outcomes with timing and retry decisions at
     /// <c>Debug</c>, and failures of background work (token refresh, session persistence, Realtime reconnection) at
-    /// <c>Warning</c>. Each sub-client logs under its own category (<c>Supabase.Gotrue</c>, <c>Supabase.Postgrest</c>,
-    /// <c>Supabase.Storage</c>, <c>Supabase.Functions</c>, <c>Supabase.Realtime</c>). Left null, the SDK logs nothing.
+    /// <c>Warning</c>. Each sub-client logs under its own category (<c>supabase.gotrue</c>, <c>supabase.postgrest</c>,
+    /// <c>supabase.storage</c>, <c>supabase.functions</c>, <c>supabase.realtime</c>). Left null, the SDK logs nothing.
     /// </summary>
     /// <remarks>
     /// Credentials, tokens, request and response bodies, query strings and header values are never logged. A logger that
@@ -189,8 +206,6 @@ public class SupabaseOptions
     /// </example>
     [ImplementedCapability("client.observability.diagnostic_logging")]
     public Microsoft.Extensions.Logging.ILoggerFactory? LoggerFactory { get; set; }
-
-    internal const string RealtimeLoggerCategory = "Supabase.Realtime";
 
     internal Microsoft.Extensions.Logging.ILogger? LoggerFor(string category) => this.LoggerFactory?.CreateLogger(category);
 

@@ -10,8 +10,8 @@
         <NeutralLanguage>en-US</NeutralLanguage>
         <PackageTags>supabase;official;storage;files;upload;buckets;signed-url;tus</PackageTags>
         <!-- x-release-please-start-version -->
-        <ReleaseVersion>8.13.0</ReleaseVersion>
-        <PackageVersion>8.13.0</PackageVersion>
+        <ReleaseVersion>8.14.0</ReleaseVersion>
+        <PackageVersion>8.14.0</PackageVersion>
         <!-- x-release-please-end -->
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -24,13 +24,17 @@
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Version)' == '' ">
-        <VersionPrefix Condition=" '$(VersionPrefix)' == '' ">8.13.0</VersionPrefix> <!-- x-release-please-version -->
+        <VersionPrefix Condition=" '$(VersionPrefix)' == '' ">8.14.0</VersionPrefix> <!-- x-release-please-version -->
         <Version Condition=" '$(Version)' == '' ">$(VersionPrefix)</Version>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="BirdMessenger" />
       <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        <PrivateAssets>all</PrivateAssets>
+      </PackageReference>
+      <PackageReference Include="PolySharp">
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         <PrivateAssets>all</PrivateAssets>
       </PackageReference>

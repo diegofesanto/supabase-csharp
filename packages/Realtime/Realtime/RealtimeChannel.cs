@@ -5,7 +5,6 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Timers;
 using Supabase.Core.Attributes;
 using Supabase.Core.Logging;
 using Supabase.Realtime.Broadcast;
@@ -20,7 +19,6 @@ using Supabase.Realtime.Socket.Responses;
 using static Supabase.Realtime.Constants;
 using static Supabase.Realtime.Interfaces.IRealtimeChannel;
 using static Supabase.Realtime.PostgresChanges.PostgresChangesOptions;
-using Timer = System.Timers.Timer;
 
 // ReSharper disable InvalidXmlDocComment
 
@@ -166,7 +164,10 @@ public class RealtimeChannel : IRealtimeChannel
     private bool CanPush => this.IsJoined && this.Socket.IsConnected;
     private bool hasJoinedOnce;
     private int subscribeCancellations;
-    private readonly Timer rejoinTimer;
+    private readonly ITimer rejoinTimer;
+    private readonly TimeSpan rejoinInterval;
+    private readonly object rejoinTimerGate = new();
+    private bool isRejoinTimerRunning;
     private bool isRejoining;
 
     private List<Binding> bindings = [];
@@ -183,9 +184,9 @@ public class RealtimeChannel : IRealtimeChannel
         this.Socket = socket;
         this.Socket.AddStateChangedHandler(this.HandleSocketStateChanged);
 
-        this.rejoinTimer = new Timer(options.ClientOptions.Timeout.TotalMilliseconds);
-        this.rejoinTimer.Elapsed += this.HandleRejoinTimerElapsed;
-        this.rejoinTimer.AutoReset = true;
+        this.rejoinInterval = options.ClientOptions.Timeout;
+        this.rejoinTimer = options.ClientOptions.TimeProvider.CreateTimer(_ => Debugger.Instance.Guard(this, this.HandleRejoinTimerElapsed), null,
+            Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
     }
 
     /// <summary>
@@ -307,13 +308,13 @@ public class RealtimeChannel : IRealtimeChannel
     private void NotifyStateChanged(ChannelState state, bool shouldRejoin = true)
     {
         this.State = state;
-        this.Options.ClientOptions.Logger.BackgroundWorkEvent("Supabase.Realtime", $"channel {this.Topic} {state}");
+        this.Options.ClientOptions.Logger.BackgroundWorkEvent(RealtimeLogging.Category, $"channel {this.Topic} {state}");
 
         this.isRejoining = shouldRejoin;
         if (shouldRejoin)
-            this.rejoinTimer.Start();
+            this.StartRejoinTimer();
         else
-            this.rejoinTimer.Stop();
+            this.StopRejoinTimer();
 
         foreach (var handler in this.stateChangedHandlers.Snapshot())
         {
@@ -618,25 +619,53 @@ public class RealtimeChannel : IRealtimeChannel
     /// <param name="payload"></param>
     /// <param name="timeoutMs"></param>
     [ImplementedCapability("realtime.channel.broadcast")]
-    public Task<bool> Send(ChannelEventName eventName, string? type, object payload, int timeoutMs = DefaultTimeout)
+    public Task<bool> Send(ChannelEventName eventName, string? type, object payload, int timeoutMs = DefaultTimeout) =>
+        IsOk(this.SendForReply(eventName, type, payload, timeoutMs));
+
+    /// <summary>
+    /// Sends a push and returns the server's reply, or null when the server sends none.
+    /// </summary>
+    internal Task<SocketResponse?> SendForReply(ChannelEventName eventName, string? type, object payload, int timeoutMs, CancellationToken cancellationToken = default)
     {
         var push = this.Push(Core.Helpers.GetMappedToAttr(eventName).Mapping, type, payload, timeoutMs);
-        // The server only sends a `phx_reply` for a `broadcast` push when the channel joined
-        // with `config.broadcast.ack = true`. Without that, no reply will ever arrive, so
-        // waiting for one would hang forever - resolve as soon as the push has been dispatched.
-        return eventName == ChannelEventName.Broadcast && this.BroadcastOptions?.BroadcastAck != true
-            ? Task.FromResult(true)
-            : PushAwaiter.Await(push);
+        return this.ServerReplies(eventName)
+            ? PushAwaiter.ReplyAsync(push, cancellationToken)
+            : Task.FromResult<SocketResponse?>(null);
+    }
+
+    private bool ServerReplies(ChannelEventName eventName) =>
+        eventName != ChannelEventName.Broadcast || this.BroadcastOptions?.BroadcastAck == true;
+
+    private static async Task<bool> IsOk(Task<SocketResponse?> sending)
+    {
+        var reply = await sending.ConfigureAwait(false);
+        return reply == null || reply.Payload?.Status == PhoenixStatusOk;
     }
 
     /// <inheritdoc />
     [ImplementedCapability("realtime.channel.broadcast_http")]
     public Task HttpSendAsync(string eventName, object payload, CancellationToken cancellationToken = default) =>
-        this.Socket.HttpSendAsync(this, eventName, payload, cancellationToken);
+        this.Socket.HttpSendAsync(this, eventName, payload, null, cancellationToken);
+
+    /// <inheritdoc />
+    [ImplementedCapability("realtime.channel.broadcast_persist")]
+    public Task HttpSendPersistedAsync(string eventName, object payload, BroadcastPersistence persistence, CancellationToken cancellationToken = default)
+    {
+        this.EnsureCanPersist(persistence);
+        return this.Socket.HttpSendAsync(this, eventName, payload, persistence, cancellationToken);
+    }
+
+    internal void EnsureCanPersist(BroadcastPersistence persistence)
+    {
+        if (persistence == null)
+            throw new ArgumentNullException(nameof(persistence));
+        if (!this.Options.IsPrivate)
+            throw new RealtimeException("A persisted broadcast needs a private channel.");
+    }
 
     /// <summary>
-    /// Awaits a reply for a given <see cref="Channel.Push"/>, resolving with whether the server replied
-    /// <c>ok</c>, or faulting with a <see cref="RealtimeException"/> if the push times out first.
+    /// Awaits a reply for a given <see cref="Channel.Push"/>, resolving with the reply, faulting with a
+    /// <see cref="RealtimeException"/> if the push times out first, or cancelled when the caller cancels first.
     ///
     /// Kept as instance methods (rather than local lambdas referencing each other) so there's no
     /// self/mutually-referencing closure over locals that get assigned after the closure is created.
@@ -644,7 +673,7 @@ public class RealtimeChannel : IRealtimeChannel
     private sealed class PushAwaiter
     {
         private readonly Push push;
-        private readonly TaskCompletionSource<bool> taskCompletion = new();
+        private readonly TaskCompletionSource<SocketResponse?> taskCompletion = new();
 
         private PushAwaiter(Push push)
         {
@@ -655,12 +684,17 @@ public class RealtimeChannel : IRealtimeChannel
                 this.HandleMessageReceived(this.push, reply);
         }
 
-        public static Task<bool> Await(Push push) => new PushAwaiter(push).taskCompletion.Task;
+        public static async Task<SocketResponse?> ReplyAsync(Push push, CancellationToken cancellationToken)
+        {
+            var awaiter = new PushAwaiter(push);
+            using var stopWaiting = cancellationToken.Register(() => awaiter.taskCompletion.TrySetCanceled(cancellationToken));
+            return await awaiter.taskCompletion.Task.ConfigureAwait(false);
+        }
 
         private void HandleMessageReceived(IRealtimePush<RealtimeChannel, SocketResponse> sender, SocketResponse message)
         {
             this.Detach();
-            this.taskCompletion.TrySetResult(message.Payload?.Status == PhoenixStatusOk);
+            this.taskCompletion.TrySetResult(message);
         }
 
         private void HandleTimeout(object sender, EventArgs e)
@@ -736,9 +770,7 @@ public class RealtimeChannel : IRealtimeChannel
     /// <summary>
     /// If the channel errors internally (phoenix error, not transport) attempt rejoining.
     /// </summary>
-    /// <param name="sender"></param>
-    /// <param name="e"></param>
-    private void HandleRejoinTimerElapsed(object sender, ElapsedEventArgs e)
+    private void HandleRejoinTimerElapsed()
     {
         if (this.isRejoining) return;
         this.isRejoining = true;
@@ -752,6 +784,25 @@ public class RealtimeChannel : IRealtimeChannel
         this.JoinPush = this.GenerateJoinPush();
 
         this.Rejoin();
+    }
+
+    private void StartRejoinTimer()
+    {
+        lock (this.rejoinTimerGate)
+        {
+            if (this.isRejoinTimerRunning) return;
+            this.isRejoinTimerRunning = true;
+            this.rejoinTimer.Change(this.rejoinInterval, this.rejoinInterval);
+        }
+    }
+
+    private void StopRejoinTimer()
+    {
+        lock (this.rejoinTimerGate)
+        {
+            this.isRejoinTimerRunning = false;
+            this.rejoinTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        }
     }
 
     private void NotifyJoined()
@@ -800,7 +851,7 @@ public class RealtimeChannel : IRealtimeChannel
             // A response was received from the channel
             case PhoenixStatusOk:
                 // Disable Rejoin Timeout
-                this.rejoinTimer.Stop();
+                this.StopRejoinTimer();
                 this.isRejoining = false;
 
                 var authPush = this.GenerateAuthPush();
@@ -812,7 +863,7 @@ public class RealtimeChannel : IRealtimeChannel
                     this.NotifyJoined();
                 break;
             case PhoenixStatusError:
-                this.rejoinTimer.Stop();
+                this.StopRejoinTimer();
                 this.isRejoining = false;
 
                 this.NotifyErrorOccurred(new RealtimeException(message.Json)

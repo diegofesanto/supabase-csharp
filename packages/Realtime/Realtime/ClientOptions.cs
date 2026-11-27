@@ -49,6 +49,15 @@ public class ClientOptions
     public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(20);
 
     /// <summary>
+    /// The version of the Realtime protocol the client speaks. <see cref="Supabase.Realtime.ProtocolVersion.V2"/>
+    /// carries a broadcast whose payload is bytes, sent with <see cref="Interfaces.IRealtimeBroadcast.SendBinary"/>
+    /// and read from <see cref="Models.BaseBroadcast.BinaryPayload"/>. Defaults to
+    /// <see cref="Supabase.Realtime.ProtocolVersion.V1"/>.
+    /// </summary>
+    [ImplementedCapability("realtime.configuration.binary_protocol")]
+    public ProtocolVersion ProtocolVersion { get; set; } = ProtocolVersion.V1;
+
+    /// <summary>
     /// How long <c>ProbeConnection</c> waits for the heartbeat reply before the socket reconnects. Defaults to 5 seconds.
     /// </summary>
     public TimeSpan ProbeTimeout { get; set; } = TimeSpan.FromSeconds(5);
@@ -131,4 +140,15 @@ public class ClientOptions
     /// </summary>
     [ImplementedCapability("realtime.configuration.custom_logger")]
     public Microsoft.Extensions.Logging.ILogger? Logger { get; set; }
+
+    /// <summary>
+    /// The clock the socket heartbeat and probe, push timeouts, channel rejoin, reconnect delays, the
+    /// <see cref="DisconnectOnEmptyChannelsAfter"/> delay and the HTTP broadcast timeout wait on. Defaults to
+    /// <see cref="System.TimeProvider.System"/>; supply another provider to run them from a host's own timers, such as
+    /// a frame loop where OS timers never fire. The WebSocket transport's own timers belong to the
+    /// <see cref="IWebSocketFactory"/> and are not affected.
+    /// </summary>
+    public TimeProvider TimeProvider { get; set; } = TimeProvider.System;
+
+    internal bool IsProtocolVersionV2() => this.ProtocolVersion == ProtocolVersion.V2;
 }

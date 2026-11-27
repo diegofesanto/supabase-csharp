@@ -345,7 +345,7 @@ public class Client : IRealtimeClient<RealtimeSocket, RealtimeChannel>
     {
         var failure = refresh.Exception!.InnerException!;
         Debugger.Instance.Log(this, failure.Message, failure);
-        this.Options.Logger.BackgroundWorkFailed("Supabase.Realtime", "Access token refresh on heartbeat", failure);
+        this.Options.Logger.BackgroundWorkFailed(RealtimeLogging.Category, "Access token refresh on heartbeat", failure);
     }
 
     private async Task RefreshAuthAsync()
@@ -514,7 +514,7 @@ public class Client : IRealtimeClient<RealtimeSocket, RealtimeChannel>
     {
         var socket = this.Socket;
         var generation = Interlocked.Increment(ref this.disconnectGeneration);
-        await Task.Delay(delay).ConfigureAwait(false);
+        await this.Options.TimeProvider.Delay(delay).ConfigureAwait(false);
         if (generation == this.disconnectGeneration && socket != null && this.Socket == socket && this.subscriptions.Count == 0)
             this.Disconnect();
     }

@@ -46,9 +46,9 @@ public class ClientOptions
     public RetryOptions Retry { get; set; } = new RetryOptions();
 
     /// <summary>
-    /// Whether the SDK adds the current trace context (<c>traceparent</c>, <c>tracestate</c>, <c>baggage</c>) to each
-    /// request. Defaults to <see cref="TracePropagation.Enabled"/>. <see cref="TracePropagation.Disabled"/> stops the SDK
-    /// from injecting it; the .NET runtime's own injection is controlled through
+    /// Whether the SDK adds trace context (<c>traceparent</c>, <c>tracestate</c>, <c>baggage</c>) to each
+    /// request: the current activity's, or a new unsampled <c>traceparent</c> when there is none. Defaults to
+    /// <see cref="TracePropagation.Enabled"/>. <see cref="TracePropagation.Disabled"/> stops the SDK from injecting it; the .NET runtime's own injection is controlled through
     /// <see cref="System.Diagnostics.DistributedContextPropagator.Current"/>.
     /// </summary>
     public TracePropagation TracePropagation { get; set; } = TracePropagation.Enabled;
@@ -59,6 +59,12 @@ public class ClientOptions
     /// query strings or header values.
     /// </summary>
     public Microsoft.Extensions.Logging.ILogger? Logger { get; set; }
+
+    /// <summary>
+    /// The clock the retry backoff and <see cref="Timeout"/> wait on. Defaults to <see cref="System.TimeProvider.System"/>;
+    /// supply another provider to run them from a host's own timers, such as a frame loop where OS timers never fire.
+    /// </summary>
+    public TimeProvider TimeProvider { get; set; } = TimeProvider.System;
 
     /// <summary>
     /// Fails a request that runs longer than this, retries included, with a TaskCanceledException.

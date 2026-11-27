@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Diagnostics;
 using Supabase.Realtime;
 using Supabase.Realtime.Socket;
@@ -16,10 +15,11 @@ internal static class Helpers
 
     public static Supabase.Postgrest.Client RestClient() => new(RestEndpoint, new Supabase.Postgrest.ClientOptions());
 
-    public static Client SocketClient()
+    public static Client SocketClient(ProtocolVersion protocolVersion = ProtocolVersion.V1)
     {
         var client = new Client(SocketEndpoint, new ClientOptions
         {
+            ProtocolVersion = protocolVersion,
             Parameters = new SocketOptionsParameters
             {
                 ApiKey = ApiKeyAnon

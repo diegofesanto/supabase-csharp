@@ -72,7 +72,8 @@ internal static class Helpers
         Dictionary<string, string> headers, CancellationToken cancellationToken = default) where T : class
     {
         var response = await MakeRequestAsync(httpClient, options, method, url, data, headers, cancellationToken).ConfigureAwait(false);
-        var content = await response.Content.ReadAsStringAsync();
+        // Stryker disable once Boolean : the body is already buffered and an earlier await left the caller's context
+        var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
         return JsonBodyReader.Deserialize<T>(content, SerializerOptions, e => new SupabaseStorageException(e.Message, e)
         {
@@ -136,16 +137,17 @@ internal static class Helpers
 
         try
         {
-            var response = await RetryExecutor.SendAsync(httpClient, CreateRequest, options.Retry, options.TracePropagation, options.Logger, cancellationToken).ConfigureAwait(false);
+            var response = await RetryExecutor.SendAsync(httpClient, CreateRequest, options.Retry, options.TracePropagation, options.Logger, options.TimeProvider, cancellationToken).ConfigureAwait(false);
             statusCode = (int) response.StatusCode;
             activity.SetHttpResponseTags(statusCode.Value);
 
-            var content = await response.Content.ReadAsStringAsync();
+            // Stryker disable once Boolean : the body is already buffered and an earlier await left the caller's context
+            var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
                 var errorResponse = ErrorResponse.TryParse(content);
-                var resolvedStatus = errorResponse?.StatusCode ?? (int) response.StatusCode;
+                var resolvedStatus = errorResponse?.StatusCode is > 0 ? errorResponse.StatusCode : (int) response.StatusCode;
                 errorType = resolvedStatus.ToString();
                 var e = new SupabaseStorageException(errorResponse?.Message ?? content)
                 {
@@ -195,13 +197,6 @@ internal static class Helpers
         authorized["Authorization"] = $"Bearer {accessToken}";
         return authorized;
     }
-
-    /// <summary>
-    /// Percent-encodes each segment of a storage path so a <c>?</c> or <c>#</c> in a key can't start
-    /// a query string or fragment, while <c>/</c> stays literal as the separator.
-    /// </summary>
-    internal static string EncodePath(string path) =>
-        string.Join("/", path.Split('/').Select(Uri.EscapeDataString));
 }
 
 public class GenericResponse
@@ -233,11 +228,37 @@ public class ErrorResponse
     {
         try
         {
-            return JsonSerializer.Deserialize<ErrorResponse>(content, Helpers.SerializerOptions);
+            return ReadIcebergEnvelope(content) ?? JsonSerializer.Deserialize<ErrorResponse>(content, Helpers.SerializerOptions);
         }
         catch (JsonException)
         {
             return null;
         }
+    }
+
+    private static ErrorResponse? ReadIcebergEnvelope(string content)
+    {
+        var envelope = JsonSerializer.Deserialize<ErrorEnvelope>(content, Helpers.SerializerOptions)?.Error;
+        return envelope is { ValueKind: JsonValueKind.Object }
+            ? ToErrorResponse(envelope.Value.Deserialize<IcebergError>(Helpers.SerializerOptions)!)
+            : null;
+    }
+
+    private static ErrorResponse ToErrorResponse(IcebergError error) =>
+        new() { Message = error.Message, Code = error.Type };
+
+    private sealed class ErrorEnvelope
+    {
+        [JsonPropertyName("error")]
+        public JsonElement? Error { get; set; }
+    }
+
+    private sealed class IcebergError
+    {
+        [JsonPropertyName("message")]
+        public string? Message { get; set; }
+
+        [JsonPropertyName("type")]
+        public string? Type { get; set; }
     }
 }

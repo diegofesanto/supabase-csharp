@@ -6,8 +6,12 @@ using System.Threading.Tasks;
 using Supabase.Core;
 using Supabase.Core.Attributes;
 using Supabase.Core.Extensions;
+using Supabase.Storage.Common;
 using Supabase.Storage.Exceptions;
 using Supabase.Storage.Extensions;
+using Supabase.Storage.FileBuckets.Common;
+using Supabase.Storage.FileBuckets.GetBucketLifecycle;
+using Supabase.Storage.FileBuckets.UpdateBucketLifecycle;
 using Supabase.Storage.Interfaces;
 
 namespace Supabase.Storage;
@@ -117,7 +121,8 @@ public class StorageBucketApi : IStorageBucketApi<Bucket>
             Name = id,
             Public = options.Public,
             FileSizeLimit = options.FileSizeLimit,
-            AllowedMimes = options.AllowedMimes
+            AllowedMimes = options.AllowedMimes,
+            VersioningStatus = options.VersioningStatus
         };
 
         var result = await Helpers.MakeRequestAsync<Bucket>(this.requestClient, this.Options, HttpMethod.Post, $"{this.Url}/bucket", data, this.Headers);
@@ -141,7 +146,8 @@ public class StorageBucketApi : IStorageBucketApi<Bucket>
             Id = id,
             Public = options.Public,
             FileSizeLimit = options.FileSizeLimit,
-            AllowedMimes = options.AllowedMimes
+            AllowedMimes = options.AllowedMimes,
+            VersioningStatus = options.VersioningStatus
         };
 
         var result = await Helpers.MakeRequestAsync<Bucket>(this.requestClient, this.Options, HttpMethod.Put, $"{this.Url}/bucket/{id}", data, this.Headers);
@@ -176,7 +182,37 @@ public class StorageBucketApi : IStorageBucketApi<Bucket>
         CancellationToken cancellationToken = default
     )
     {
-        var url = options.ToPurgeUrl($"{this.Url}/cdn/{Helpers.EncodePath(id)}");
+        var url = options.ToPurgeUrl($"{this.Url}/cdn/{PathSegment.EscapeObjectPath(id, nameof(id))}");
         return Helpers.MakeRequestAsync<GenericResponse>(this.requestClient, this.Options, HttpMethod.Delete, url, null, this.Headers, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    [ImplementedCapability("storage.file_buckets.purge_project_cache")]
+    public Task PurgeProjectCacheAsync(PurgeCacheOptions? options = null, CancellationToken cancellationToken = default) =>
+        Helpers.MakeRequestAsync(this.requestClient, this.Options, HttpMethod.Delete, options.ToPurgeUrl($"{this.Url}/cdn/"), null, this.Headers, cancellationToken);
+
+    /// <inheritdoc />
+    [ImplementedCapability("storage.file_buckets.delete_bucket_lifecycle")]
+    public Task DeleteBucketLifecycleAsync(string id, CancellationToken cancellationToken = default) =>
+        Helpers.MakeRequestAsync(this.requestClient, this.Options, HttpMethod.Delete, BucketLifecyclePath.For(this.Url, id), null, this.Headers, cancellationToken);
+
+    /// <inheritdoc />
+    [ImplementedCapability("storage.file_buckets.get_bucket_lifecycle")]
+    public async Task<BucketLifecycle> GetBucketLifecycleAsync(string id, CancellationToken cancellationToken = default)
+    {
+        var response = await Helpers.MakeRequestAsync<GetBucketLifecycleResponse>(this.requestClient, this.Options, HttpMethod.Get, BucketLifecyclePath.For(this.Url, id), null, this.Headers, cancellationToken).ConfigureAwait(false)
+            ?? throw new SupabaseStorageException("The storage service returned an empty lifecycle policy.");
+        return response.ToLifecycle();
+    }
+
+    /// <inheritdoc />
+    [ImplementedCapability("storage.file_buckets.update_bucket_lifecycle")]
+    public async Task<BucketLifecycle> UpdateBucketLifecycleAsync(string id, BucketLifecycle lifecycle, CancellationToken cancellationToken = default)
+    {
+        if (lifecycle is null)
+            throw new ArgumentNullException(nameof(lifecycle));
+        var response = await Helpers.MakeRequestAsync<GetBucketLifecycleResponse>(this.requestClient, this.Options, HttpMethod.Put, BucketLifecyclePath.For(this.Url, id), new UpdateBucketLifecycleBody(lifecycle), this.Headers, cancellationToken).ConfigureAwait(false)
+            ?? throw new SupabaseStorageException("The storage service returned an empty lifecycle policy.");
+        return response.ToLifecycle();
     }
 }

@@ -1,7 +1,9 @@
-﻿using Supabase.Realtime.Socket;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
+using Supabase.Realtime.Broadcast;
 using Supabase.Realtime.Models;
+using Supabase.Realtime.Socket;
 using static Supabase.Realtime.Constants;
 
 namespace Supabase.Realtime.Interfaces;
@@ -21,13 +23,13 @@ public interface IRealtimeBroadcast
     /// </summary>
     /// <param name="broadcastEventHandler"></param>
     void AddBroadcastEventHandler(BroadcastEventHandler broadcastEventHandler);
-        
+
     /// <summary>
     /// Removes a broadcast event handler
     /// </summary>
     /// <param name="broadcastEventHandler"></param>
     void RemoveBroadcastEventHandler(BroadcastEventHandler broadcastEventHandler);
-        
+
     /// <summary>
     /// Clears all broadcast event handlers
     /// </summary>
@@ -41,6 +43,50 @@ public interface IRealtimeBroadcast
     /// <param name="timeoutMs"></param>
     /// <returns></returns>
     Task<bool> Send(string? broadcastEventName, object payload, int timeoutMs = DefaultTimeout);
+
+    /// <summary>
+    /// Sends a broadcast whose payload is bytes, in a binary frame. Needs a client that speaks
+    /// <see cref="ProtocolVersion.V2"/>, and only subscribers that speak it too receive the broadcast; they read
+    /// the bytes from <see cref="BaseBroadcast.BinaryPayload"/>.
+    /// </summary>
+    /// <param name="broadcastEventName">The event name, at most 255 bytes.</param>
+    /// <param name="payload">The bytes to send.</param>
+    /// <param name="timeoutMs">How long to wait for the acknowledgment, when the channel asked for one.</param>
+    /// <exception cref="Supabase.Realtime.Exceptions.RealtimeException">The client speaks protocol 1.0.0, the channel topic is longer than 255 bytes, or the server rejected the broadcast or did not acknowledge it in time.</exception>
+    /// <exception cref="ArgumentException">The event name is longer than 255 bytes.</exception>
+    /// <example>
+    /// <code>
+    /// var broadcast = channel.Register&lt;BaseBroadcast&gt;();
+    /// await channel.Subscribe();
+    /// await broadcast.SendBinary("frame", bytes);
+    /// </code>
+    /// </example>
+    Task SendBinary(string broadcastEventName, byte[] payload, int timeoutMs = DefaultTimeout);
+
+    /// <summary>
+    /// Sends a broadcast that the server stores for replay. Needs a private channel and a client that speaks
+    /// <see cref="ProtocolVersion.V2"/>. Unlike <see cref="Send"/>, it takes the payload itself, not a
+    /// <see cref="BaseBroadcast"/>: a <c>byte[]</c> is sent as bytes, anything else as JSON. With
+    /// <see cref="BroadcastOptions.BroadcastAck"/> on, the send waits for the acknowledgment and fails when the server
+    /// did not store the broadcast, naming why in <see cref="Supabase.Realtime.Exceptions.RealtimeException.Reason"/>.
+    /// </summary>
+    /// <param name="eventName">The event name, at most 255 bytes.</param>
+    /// <param name="payload">The payload: a <c>byte[]</c> is sent as bytes, anything else as JSON.</param>
+    /// <param name="persistence">How long the server keeps the broadcast.</param>
+    /// <param name="timeoutMs">How long to wait for the acknowledgment, when the channel asked for one.</param>
+    /// <param name="cancellationToken">Stops the send before it goes out, or stops waiting for the acknowledgment.</param>
+    /// <exception cref="OperationCanceledException">The caller cancelled before the send went out or before the acknowledgment arrived.</exception>
+    /// <exception cref="Supabase.Realtime.Exceptions.RealtimeException">The channel is public, the client speaks protocol 1.0.0, the channel topic is longer than 255 bytes, or the server did not store the broadcast or did not acknowledge it in time.</exception>
+    /// <exception cref="ArgumentException">The payload is a <see cref="BaseBroadcast"/>, or the event name is longer than 255 bytes.</exception>
+    /// <example>
+    /// <code>
+    /// var channel = client.PrivateChannel("room");
+    /// var broadcast = channel.Register&lt;BaseBroadcast&gt;(broadcastAck: true);
+    /// await channel.Subscribe();
+    /// await broadcast.SendPersistedAsync("chat", new { text = "hi" }, BroadcastPersistence.For(TimeSpan.FromHours(1)));
+    /// </code>
+    /// </example>
+    Task SendPersistedAsync(string eventName, object payload, BroadcastPersistence persistence, int timeoutMs = DefaultTimeout, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// An internal trigger used for notifying event delegates.

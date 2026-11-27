@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Supabase.Core.Attributes;
 using Supabase.Realtime.Broadcast;
+using Supabase.Realtime.Exceptions;
 using Supabase.Realtime.Interfaces;
 using Supabase.Realtime.Models;
 using Supabase.Realtime.Socket;
@@ -36,13 +38,14 @@ public class RealtimeBroadcast<TBroadcastModel> : IRealtimeBroadcast where TBroa
     /// </summary>
     public TBroadcastModel? Current()
     {
-        if (this.lastSocketResponse == null) return null;
+        if (this.lastSocketResponse is not { } response) return null;
 
-        var obj = JsonSerializer.Deserialize<SocketResponse<TBroadcastModel>>(this.lastSocketResponse.Json!,
+        var obj = JsonSerializer.Deserialize<SocketResponse<TBroadcastModel>>(response.Json!,
             this.serializerSettings);
 
         if (obj == null || obj.Payload == null) return null;
 
+        obj.Payload.BinaryPayload = response.BinaryPayload;
         return obj.Payload;
     }
 
@@ -63,19 +66,13 @@ public class RealtimeBroadcast<TBroadcastModel> : IRealtimeBroadcast where TBroa
     /// Adds a broadcast event listener.
     /// </summary>
     /// <param name="broadcastEventHandler"></param>
-    public void AddBroadcastEventHandler(IRealtimeBroadcast.BroadcastEventHandler broadcastEventHandler)
-    {
-        this.broadcastEventHandlers.Add(broadcastEventHandler);
-    }
+    public void AddBroadcastEventHandler(IRealtimeBroadcast.BroadcastEventHandler broadcastEventHandler) => this.broadcastEventHandlers.Add(broadcastEventHandler);
 
     /// <summary>
     /// Removes a broadcast event listener.
     /// </summary>
     /// <param name="broadcastEventHandler"></param>
-    public void RemoveBroadcastEventHandler(IRealtimeBroadcast.BroadcastEventHandler broadcastEventHandler)
-    {
-        this.broadcastEventHandlers.Remove(broadcastEventHandler);
-    }
+    public void RemoveBroadcastEventHandler(IRealtimeBroadcast.BroadcastEventHandler broadcastEventHandler) => this.broadcastEventHandlers.Remove(broadcastEventHandler);
 
     /// <summary>
     /// Clears all broadcast event listeners
@@ -116,5 +113,52 @@ public class RealtimeBroadcast<TBroadcastModel> : IRealtimeBroadcast where TBroa
             baseBroadcast.Event = broadcastEventName;
 
         return this.channel.Send(ChannelEventName.Broadcast, broadcastEventName, payload, timeoutMs);
+    }
+
+    /// <inheritdoc />
+    public async Task SendBinary(string broadcastEventName, byte[] payload, int timeoutMs = DefaultTimeout)
+    {
+        if (!this.channel.Options.ClientOptions.IsProtocolVersionV2())
+            throw new RealtimeException("A broadcast of bytes needs ClientOptions.ProtocolVersion set to V2.");
+        if (payload == null)
+            throw new ArgumentNullException(nameof(payload));
+        if (!WireFrame.Fits(broadcastEventName))
+            throw new ArgumentException("The event name of a broadcast of bytes must fit in 255 bytes.", nameof(broadcastEventName));
+        if (!WireFrame.Fits(this.channel.Topic))
+            throw new RealtimeException("The topic of a broadcast of bytes must fit in 255 bytes.");
+
+        if (!await this.channel.Send(ChannelEventName.Broadcast, null, new BinaryBroadcast(broadcastEventName, (byte[]) payload.Clone()), timeoutMs).ConfigureAwait(false))
+            throw new RealtimeException("The server rejected the broadcast of bytes.");
+    }
+
+    /// <inheritdoc />
+    [ImplementedCapability("realtime.channel.broadcast_persist")]
+    public async Task SendPersistedAsync(string eventName, object payload, BroadcastPersistence persistence, int timeoutMs = DefaultTimeout, CancellationToken cancellationToken = default)
+    {
+        this.channel.EnsureCanPersist(persistence);
+        if (payload is BaseBroadcast)
+            throw new ArgumentException("A persisted broadcast takes the payload itself, not a BaseBroadcast.", nameof(payload));
+        if (!this.channel.Options.ClientOptions.IsProtocolVersionV2())
+            throw new RealtimeException("A persisted broadcast needs ClientOptions.ProtocolVersion set to V2.");
+        if (!WireFrame.Fits(eventName))
+            throw new ArgumentException("The event name of a persisted broadcast must fit in 255 bytes.", nameof(eventName));
+        if (!WireFrame.Fits(this.channel.Topic))
+            throw new RealtimeException("The topic of a persisted broadcast must fit in 255 bytes.");
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var reply = await this.channel.SendForReply(ChannelEventName.Broadcast, null, this.PersistedBroadcast(eventName, payload, persistence), timeoutMs, cancellationToken).ConfigureAwait(false);
+        if (reply != null && reply.Payload?.Status != PhoenixStatusOk)
+            throw NotStored(reply);
+    }
+
+    private BinaryBroadcast PersistedBroadcast(string eventName, object payload, BroadcastPersistence persistence) =>
+        payload is byte[] bytes
+            ? new BinaryBroadcast(eventName, (byte[]) bytes.Clone(), metadata: persistence.Metadata)
+            : new BinaryBroadcast(eventName, JsonSerializer.SerializeToUtf8Bytes(payload, this.serializerSettings), isJson: true, persistence.Metadata);
+
+    private static RealtimeException NotStored(SocketResponse reply)
+    {
+        var code = reply.Payload?.Response is Dictionary<string, object> body && body.TryGetValue("error", out var error) ? error as string : null;
+        return new RealtimeException($"The server did not store the broadcast ({code}).") { Reason = FailureHint.Parse(code) };
     }
 }

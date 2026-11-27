@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Supabase.Core.Attributes;
 using Supabase.Core.Http;
 
 namespace Supabase.Storage;
@@ -55,12 +56,13 @@ public class ClientOptions
     /// the resumable upload APIs for interrupted transfers instead. Default (<see cref="RetryOptions.MaxRetries"/> 0)
     /// sends once, unretried.
     /// </summary>
+    [ImplementedCapability("storage.configuration.auto_retry", "Applied to bucket and object metadata calls, writes included; uploads and downloads are sent once.")]
     public RetryOptions Retry { get; set; } = new RetryOptions();
 
     /// <summary>
-    /// Whether the SDK adds the current trace context (<c>traceparent</c>, <c>tracestate</c>, <c>baggage</c>) to each
-    /// request. Defaults to <see cref="TracePropagation.Enabled"/>. <see cref="TracePropagation.Disabled"/> stops the SDK
-    /// from injecting it; the .NET runtime's own injection is controlled through
+    /// Whether the SDK adds trace context (<c>traceparent</c>, <c>tracestate</c>, <c>baggage</c>) to each
+    /// request: the current activity's, or a new unsampled <c>traceparent</c> when there is none. Defaults to
+    /// <see cref="TracePropagation.Enabled"/>. <see cref="TracePropagation.Disabled"/> stops the SDK from injecting it; the .NET runtime's own injection is controlled through
     /// <see cref="System.Diagnostics.DistributedContextPropagator.Current"/>.
     /// </summary>
     public TracePropagation TracePropagation { get; set; } = TracePropagation.Enabled;
@@ -71,4 +73,11 @@ public class ClientOptions
     /// query strings or header values.
     /// </summary>
     public Microsoft.Extensions.Logging.ILogger? Logger { get; set; }
+
+    /// <summary>
+    /// The clock the retry backoff waits on. Defaults to <see cref="System.TimeProvider.System"/>; supply another provider to
+    /// run it from a host's own timers, such as a frame loop where OS timers never fire. The HTTP timeouts belong to the
+    /// <see cref="HttpClient"/> and keep running on the system clock.
+    /// </summary>
+    public TimeProvider TimeProvider { get; set; } = TimeProvider.System;
 }
