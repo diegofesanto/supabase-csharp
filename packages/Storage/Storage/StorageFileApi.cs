@@ -630,6 +630,9 @@ public class StorageFileApi : IStorageFileApi<FileObject>
             { "destinationKey", toPath },
             { "destinationBucket", options?.DestinationBucket },
         };
+        if (options?.SourceVersionId != null)
+            body.Add("sourceVersionId", options.SourceVersionId);
+
         await Helpers.MakeRequestAsync<GenericResponse>(
             this.requestClient,
             this.Options,
@@ -663,6 +666,8 @@ public class StorageFileApi : IStorageFileApi<FileObject>
             { "destinationKey", toPath },
             { "destinationBucket", options?.DestinationBucket },
         };
+        if (options?.SourceVersionId != null)
+            body.Add("sourceVersionId", options.SourceVersionId);
 
         await Helpers.MakeRequestAsync<GenericResponse>(
             this.requestClient,

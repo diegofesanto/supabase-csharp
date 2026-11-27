@@ -25,11 +25,47 @@ public class StorageFileApprovalTests : RequestApprovalFixture
     }
 
     [TestMethod]
+    public async Task MoveRequest_ShouldSerializeToExpectedPayload_GivenBucketAndVersion()
+    {
+        this.RespondWith("{}");
+        var options = new DestinationOptions { DestinationBucket = "archive", SourceVersionId = "version" };
+        await this.Client.From("photos").Move("old/cat.png", "new/cat.png", options);
+        await this.Verify(this.EmittedRequestBody).UseDirectory("Data");
+    }
+
+    [TestMethod]
+    public async Task MoveRequest_ShouldSerializeToExpectedPayload_GivenVersionOnly()
+    {
+        this.RespondWith("{}");
+        await this.Client.From("photos").Move("old/cat.png", "new/cat.png",
+            new DestinationOptions { SourceVersionId = "version" });
+        await this.Verify(this.EmittedRequestBody).UseDirectory("Data");
+    }
+
+    [TestMethod]
     public async Task CopyRequest_ShouldSerializeToExpectedPayload_GivenDestinationBucket()
     {
         this.RespondWith("{}");
         await this.Client.From("photos").Copy("cat.png", "cat.png",
             new DestinationOptions { DestinationBucket = "archive" });
+        await this.Verify(this.EmittedRequestBody).UseDirectory("Data");
+    }
+
+    [TestMethod]
+    public async Task CopyRequest_ShouldSerializeToExpectedPayload_GivenDestinationBucketAndVersionId()
+    {
+        this.RespondWith("{}");
+        await this.Client.From("photos").Copy("cat.png", "cat.png",
+            new DestinationOptions { DestinationBucket = "archive", SourceVersionId = "version"});
+        await this.Verify(this.EmittedRequestBody).UseDirectory("Data");
+    }
+
+    [TestMethod]
+    public async Task CopyRequest_ShouldSerializeToExpectedPayload_GivenVersionOnly()
+    {
+        this.RespondWith("{}");
+        await this.Client.From("photos").Copy("cat.png", "copy/cat.png",
+            new DestinationOptions { SourceVersionId = "version" });
         await this.Verify(this.EmittedRequestBody).UseDirectory("Data");
     }
 

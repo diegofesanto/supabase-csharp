@@ -9,6 +9,7 @@ using FluentAssertions;
 using FluentAssertions.Execution;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Supabase.Storage;
+using Supabase.Storage.Exceptions;
 using Supabase.Storage.Interfaces;
 using FileOptions = Supabase.Storage.FileOptions;
 
@@ -223,6 +224,98 @@ public class StorageFileTests : StorageE2EFixture
         var items = await this.bucket.List();
         items!.Find(f => f.Name == "new-file.bin").Should().NotBeNull();
         items.Find(f => f.Name == name).Should().NotBeNull();
+    }
+
+    [TestMethod]
+    public async Task Copy_ShouldCopyCurrentBytes_GivenNoVersion()
+    {
+        var source = $"{Guid.NewGuid()}.bin";
+        var destination = $"{Guid.NewGuid()}.bin";
+        var current = new byte[] { 0x02, 0x03 };
+        await this.bucket.Upload(new byte[] { 0x00, 0x01 }, source);
+        await this.bucket.Upload(current, source, new FileOptions { Upsert = true });
+        await this.bucket.Copy(source, destination);
+        (await this.bucket.Download(destination, (EventHandler<float>?) null)).Should().Equal(current);
+        (await this.bucket.Download(source, (EventHandler<float>?) null)).Should().Equal(current);
+    }
+
+    [TestMethod]
+    public async Task Move_ShouldMoveCurrentBytes_GivenNoVersion()
+    {
+        var source = $"{Guid.NewGuid()}.bin";
+        var destination = $"{Guid.NewGuid()}.bin";
+        var current = new byte[] { 0x02, 0x03 };
+        await this.bucket.Upload(new byte[] { 0x00, 0x01 }, source);
+        await this.bucket.Upload(current, source, new FileOptions { Upsert = true });
+        await this.bucket.Move(source, destination);
+        (await this.bucket.Download(destination, (EventHandler<float>?) null)).Should().Equal(current);
+        var items = await this.bucket.List();
+        items!.Find(f => f.Name == source).Should().BeNull();
+    }
+
+    [TestMethod]
+    public async Task Copy_ShouldCopyBytes_GivenExistingVersion()
+    {
+        var source = $"{Guid.NewGuid()}.bin";
+        var destination = $"{Guid.NewGuid()}.bin";
+        var bytes = new byte[] { 0x01, 0x02 };
+        await this.bucket.Upload(bytes, source);
+        var version = (await this.bucket.Info(source))!.Version;
+        version.Should().NotBeNullOrEmpty();
+        await this.bucket.Copy(source, destination, new DestinationOptions { SourceVersionId = version });
+        (await this.bucket.Download(destination, (EventHandler<float>?) null)).Should().Equal(bytes);
+        (await this.bucket.Download(source, (EventHandler<float>?) null)).Should().Equal(bytes);
+    }
+
+    [TestMethod]
+    public async Task Move_ShouldMoveBytes_GivenExistingVersion()
+    {
+        var source = $"{Guid.NewGuid()}.bin";
+        var destination = $"{Guid.NewGuid()}.bin";
+        var bytes = new byte[] { 0x01, 0x02 };
+        await this.bucket.Upload(bytes, source);
+        var version = (await this.bucket.Info(source))!.Version;
+        version.Should().NotBeNullOrEmpty();
+        await this.bucket.Move(source, destination, new DestinationOptions { SourceVersionId = version });
+        (await this.bucket.Download(destination, (EventHandler<float>?) null)).Should().Equal(bytes);
+        var items = await this.bucket.List();
+        items!.Find(f => f.Name == source).Should().BeNull();
+    }
+
+    [TestMethod]
+    public async Task Copy_ShouldRejectNonexistentVersion()
+    {
+        var source = $"{Guid.NewGuid()}.bin";
+        var destination = $"{Guid.NewGuid()}.bin";
+        var control = $"{Guid.NewGuid()}.bin";
+        var bytes = new byte[] { 0x01, 0x02 };
+        await this.bucket.Upload(bytes, source);
+        await this.bucket.Copy(source, control);
+        var act = () => this.bucket.Copy(source, destination, new DestinationOptions { SourceVersionId = Guid.NewGuid().ToString() });
+        var exception = (await act.Should().ThrowAsync<SupabaseStorageException>()).Which;
+        exception.StatusCode.Should().Be(404);
+        exception.Code.Should().Be("NoSuchKey");
+        (await this.bucket.Download(source, (EventHandler<float>?) null)).Should().Equal(bytes);
+        var items = await this.bucket.List();
+        items!.Find(f => f.Name == destination).Should().BeNull();
+    }
+
+    [TestMethod]
+    public async Task Move_ShouldRejectNonexistentVersion()
+    {
+        var source = $"{Guid.NewGuid()}.bin";
+        var destination = $"{Guid.NewGuid()}.bin";
+        var control = $"{Guid.NewGuid()}.bin";
+        var bytes = new byte[] { 0x01, 0x02 };
+        await this.bucket.Upload(bytes, source);
+        await this.bucket.Copy(source, control);
+        var act = () => this.bucket.Move(source, destination, new DestinationOptions { SourceVersionId = Guid.NewGuid().ToString() });
+        var exception = (await act.Should().ThrowAsync<SupabaseStorageException>()).Which;
+        exception.StatusCode.Should().Be(404);
+        exception.Code.Should().Be("NoSuchKey");
+        (await this.bucket.Download(source, (EventHandler<float>?) null)).Should().Equal(bytes);
+        var items = await this.bucket.List();
+        items!.Find(f => f.Name == destination).Should().BeNull();
     }
 
     [TestMethod]
